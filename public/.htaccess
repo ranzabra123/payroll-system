@@ -1,0 +1,12 @@
+# Enable URL rewriting and hide index.php
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Skip existing files and directories
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Route everything else through the front controller
+    RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>

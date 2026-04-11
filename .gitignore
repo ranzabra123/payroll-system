@@ -1,0 +1,28 @@
+# Environment
+.env
+env
+
+# Composer
+vendor/
+composer.lock
+
+# Writable directories (logs, cache, sessions, uploads)
+writable/logs/*
+writable/cache/*
+writable/session/*
+writable/uploads/*
+writable/debugbar/*
+!writable/logs/.gitkeep
+!writable/cache/.gitkeep
+!writable/session/.gitkeep
+!writable/uploads/.gitkeep
+!writable/debugbar/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

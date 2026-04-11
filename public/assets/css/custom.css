@@ -1,0 +1,352 @@
+/* ============================================================
+   Payroll Management System – Custom Styles
+   ============================================================ */
+
+/* Variables */
+:root {
+    --sidebar-width: 260px;
+    --primary:       #2563eb;
+    --primary-dark:  #1e40af;
+    --sidebar-bg:    #1e293b;
+    --sidebar-text:  #cbd5e1;
+    --sidebar-hover: #334155;
+    --sidebar-active:#2563eb;
+    --topbar-height: 60px;
+    --success:       #16a34a;
+    --danger:        #dc2626;
+    --warning:       #d97706;
+}
+
+/* ---- Base ---- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+/* ---- Sidebar ---- */
+#sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: var(--sidebar-bg);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    transition: transform .25s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#sidebar .sidebar-brand {
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid #334155;
+    background: #0f172a;
+}
+
+#sidebar .sidebar-brand h4 {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+#sidebar .sidebar-brand small {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+#sidebar .sidebar-menu {
+    padding: 1rem 0;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#sidebar .sidebar-menu::-webkit-scrollbar { width: 4px; }
+#sidebar .sidebar-menu::-webkit-scrollbar-track { background: transparent; }
+#sidebar .sidebar-menu::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+#sidebar .sidebar-menu::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+#sidebar .nav-section {
+    padding: 0.5rem 1.5rem 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+#sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1.5rem;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all .15s ease;
+    border-left: 3px solid transparent;
+}
+
+#sidebar .nav-link:hover {
+    background: var(--sidebar-hover);
+    color: #fff;
+    border-left-color: var(--primary);
+}
+
+#sidebar .nav-link.active {
+    background: var(--sidebar-hover);
+    color: #fff;
+    border-left-color: var(--sidebar-active);
+    font-weight: 600;
+}
+
+#sidebar .nav-link i {
+    width: 18px;
+    text-align: center;
+    font-size: 1rem;
+}
+
+#sidebar .sidebar-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #334155;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+/* ---- Main content ---- */
+#main-content {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left .25s ease;
+}
+
+/* ---- Topbar ---- */
+#topbar {
+    height: var(--topbar-height);
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+#topbar .topbar-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1e293b;
+    flex: 1;
+}
+
+#topbar .user-badge {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-size: .88rem;
+    color: #475569;
+}
+
+#topbar .user-badge .avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+/* ---- Page body ---- */
+.page-body {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+/* ---- Stat cards ---- */
+.stat-card {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    transition: box-shadow .2s;
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+
+.stat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+/* ---- Cards ---- */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+
+.card-header {
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+    font-weight: 600;
+    padding: .9rem 1.25rem;
+}
+
+/* ---- Tables ---- */
+.table thead th {
+    background: #f8fafc;
+    font-size: .82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #64748b;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* ---- Payslip ---- */
+.payslip-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.payslip-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 1.5rem 2rem;
+    border-radius: 8px 8px 0 0;
+}
+
+.payslip-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .35rem 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: .9rem;
+}
+
+.payslip-total {
+    font-weight: 700;
+    font-size: 1.05rem;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+
+/* ---- Badges ---- */
+.badge-active   { background: #dcfce7; color: #166534; }
+.badge-inactive { background: #fee2e2; color: #991b1b; }
+.badge-draft    { background: #fef3c7; color: #92400e; }
+.badge-final    { background: #dbeafe; color: #1e40af; }
+
+/* ---- Forms ---- */
+.form-label { font-weight: 500; font-size: .9rem; }
+.form-control, .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: .9rem;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+
+/* ---- Buttons ---- */
+.btn { border-radius: 6px; font-size: .88rem; }
+.btn-primary   { background: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+/* ---- Login page ---- */
+.login-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    width: 420px;
+    max-width: 95vw;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    overflow: hidden;
+}
+
+.login-card .login-header {
+    background: #1e293b;
+    padding: 2rem;
+    text-align: center;
+    color: #fff;
+}
+
+.login-card .login-body {
+    padding: 2rem;
+    background: #fff;
+}
+
+/* ---- Attendance grid ---- */
+.att-badge-whole  { background:#22c55e;  color:#fff; }
+.att-badge-half   { background:#f59e0b;  color:#fff; }
+.att-badge-absent { background:#ef4444;  color:#fff; }
+
+/* ---- Sidebar toggle button ---- */
+#sidebar-toggle {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    flex-shrink: 0;
+    transition: background .15s;
+}
+#sidebar-toggle:hover { background: #f1f5f9; color: #1e293b; }
+
+/* ---- Desktop collapsed sidebar ---- */
+body.sidebar-collapsed #sidebar { transform: translateX(-100%); }
+body.sidebar-collapsed #main-content { margin-left: 0; }
+
+/* ---- Responsive sidebar collapse ---- */
+@media (max-width: 992px) {
+    #sidebar { transform: translateX(-100%); }
+    #sidebar.show { transform: translateX(0); }
+    #main-content { margin-left: 0; }
+    body.sidebar-collapsed #sidebar { transform: translateX(-100%); }
+    body.sidebar-collapsed #main-content { margin-left: 0; }
+}
+
+/* ---- Print styles ---- */
+@media print {
+    #sidebar, #topbar, .no-print { display: none !important; }
+    #main-content { margin-left: 0 !important; }
+    .payslip-wrapper { box-shadow: none; border: 1px solid #ccc; }
+    .page-body { padding: 0; }
+}
