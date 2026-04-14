@@ -81,7 +81,7 @@ class AttendanceController extends Controller
         $savedCount = 0;
         foreach ($attendance as $employeeId => $type) {
             $employeeId = (int) $employeeId;
-            if (! in_array($type, ['whole_day', 'half_am', 'half_pm', 'absent'], true)) {
+            if (! in_array($type, ['whole_day', 'half_am', 'half_pm', 'absent', 'day_off'], true)) {
                 continue;
             }
 

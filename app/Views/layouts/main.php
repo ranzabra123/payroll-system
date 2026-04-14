@@ -101,11 +101,8 @@ $_logoUrl     = setting_logo_url();
         </a>
         <?php endif; ?>
         <?php if (can_do('benefits', 'view')): ?>
-        <a class="nav-link" href="<?= site_url('benefits') ?>">
-            <i class="fa fa-hand-holding-heart"></i> Benefits
-        </a>
         <a class="nav-link" href="<?= site_url('benefits/summary') ?>">
-            <i class="fa fa-chart-pie"></i> Benefits Summary
+            <i class="fa fa-hand-holding-heart"></i> Benefits
         </a>
         <?php endif; ?>
         <?php if (can_do('special_days', 'view')): ?>

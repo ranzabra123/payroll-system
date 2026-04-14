@@ -13,8 +13,8 @@
     <form method="get" class="d-flex gap-2 align-items-center">
         <label class="form-label mb-0 fw-medium">Date:</label>
         <input type="date" name="date" class="form-control form-control-sm" style="width:200px;"
-               value="<?= esc($date) ?>" max="<?= date('Y-m-d') ?>"/>
-        <button class="btn btn-sm btn-primary">Load</button>
+               value="<?= esc($date) ?>" max="<?= date('Y-m-d') ?>" onchange="this.form.submit()"/>
+        
         <span class="text-muted small ms-2">
             <i class="fa fa-circle-info me-1"></i>
             <?= date('l, F j, Y', strtotime($date)) ?>
@@ -56,10 +56,12 @@
                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="markAll('absent')">
                     All Absent
                 </button>
+                <?php if (can_do('attendance', 'delete')): ?>
                 <button type="button" class="btn btn-sm btn-danger <?= empty($existingMap) ? 'd-none' : '' ?>" id="deleteAllBtn"
                         title="Remove all attendance records for this date">
                     <i class="fa fa-trash me-1"></i>Remove All
                 </button>
+                <?php endif; ?>
             </div>
 
         </div>
@@ -97,11 +99,12 @@
                             <td>
                                 <select name="attendance[<?= $emp['id'] ?>]"
                                         class="form-select form-select-sm att-select">
-                                    <?php $sel = $existing['attendance_type'] ?? 'whole_day'; ?>
+                                    <?php $sel = $existing ? $existing['attendance_type'] : 'whole_day'; ?>
                                     <option value="whole_day" <?= $sel === 'whole_day' ? 'selected' : '' ?>>Whole Day</option>
                                     <option value="half_am"   <?= $sel === 'half_am'   ? 'selected' : '' ?>>Half Day AM</option>
                                     <option value="half_pm"   <?= $sel === 'half_pm'   ? 'selected' : '' ?>>Half Day PM</option>
-                                    <option value="absent"    <?= $sel === 'absent'     ? 'selected' : '' ?>>Absent</option>
+                                    <option value="absent"    <?= $sel === 'absent'    ? 'selected' : '' ?>>Absent</option>
+                                    <option value="day_off"   <?= $sel === 'day_off'   ? 'selected' : '' ?>>Day Off</option>
                                 </select>
                             </td>
                             <td>
@@ -124,6 +127,7 @@
                 </table>
             </div>
         </div>
+        <?php if (can_do('attendance', 'add') || can_do('attendance', 'edit')): ?>
         <div class="card-footer d-flex gap-2">
             <button type="submit" class="btn btn-primary">
                 <i class="fa fa-floppy-disk me-1"></i>Save Attendance
@@ -132,6 +136,7 @@
                 Saving will overwrite existing records for this date.
             </span>
         </div>
+        <?php endif; ?>
     </div>
 </form>
 

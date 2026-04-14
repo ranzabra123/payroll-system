@@ -18,14 +18,9 @@ $badgeCls = match($deduction['status']) {
     </a>
     <h5 class="mb-0 fw-semibold">Deduction Detail</h5>
     <div class="ms-auto d-flex gap-2">
+        <?php if (can_do('deductions', 'edit')): ?>
         <a href="<?= site_url('deductions/edit/' . $deduction['id']) ?>" class="btn btn-sm btn-outline-primary">
             <i class="fa fa-pen-to-square me-1"></i>Edit
-        </a>
-        <?php if ($deduction['status'] === 'active'): ?>
-        <a href="<?= site_url('deductions/complete/' . $deduction['id']) ?>"
-           class="btn btn-sm btn-outline-success"
-           onclick="return confirm('Mark this deduction as fully paid?')">
-            <i class="fa fa-check-double me-1"></i>Mark Complete
         </a>
         <?php endif; ?>
     </div>
@@ -133,6 +128,70 @@ $badgeCls = match($deduction['status']) {
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Deduction History -->
+<div class="card mt-4">
+    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="fa fa-clock-rotate-left text-primary"></i>
+        Deduction History
+        <span class="badge bg-secondary ms-1"><?= count($history) ?></span>
+    </div>
+    <div class="card-body p-0">
+        <?php if (empty($history)): ?>
+        <div class="text-center text-muted py-4">
+            <i class="fa fa-inbox fa-2x mb-2 d-block opacity-25"></i>
+            No deduction history yet.
+        </div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Payroll Period</th>
+                        <th class="text-center">Cutoff</th>
+                        <th class="text-end">Amount Deducted</th>
+                        <th class="text-end">Balance Before</th>
+                        <th class="text-end">Balance After</th>
+                        <th class="text-center">Payroll Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($history as $h): ?>
+                <tr>
+                    <td class="fw-semibold">
+                        <?= date('M Y', strtotime($h['period_start'])) ?>
+                        <div class="text-muted" style="font-size:.75rem;">
+                            <?= date('M j', strtotime($h['period_start'])) ?> – <?= date('M j, Y', strtotime($h['period_end'])) ?>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary">
+                            <?= $h['cutoff_num'] == 1 ? '1st (1–15)' : '2nd (16–end)' ?>
+                        </span>
+                    </td>
+                    <td class="text-end text-danger fw-semibold">– ₱ <?= number_format($h['amount_deducted'], 2) ?></td>
+                    <td class="text-end">₱ <?= number_format($h['balance_before'], 2) ?></td>
+                    <td class="text-end fw-semibold <?= (float)$h['balance_after'] <= 0 ? 'text-success' : '' ?>">
+                        ₱ <?= number_format($h['balance_after'], 2) ?>
+                        <?php if ((float)$h['balance_after'] <= 0): ?>
+                        <span class="badge bg-success ms-1">Paid</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge <?= $h['payroll_status'] === 'finalized' ? 'bg-success' : 'bg-warning text-dark' ?>">
+                            <?= ucfirst($h['payroll_status']) ?>
+                        </span>
+                    </td>
+                    <td class="text-muted"><?= date('M j, Y', strtotime($h['created_at'])) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

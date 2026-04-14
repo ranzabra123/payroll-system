@@ -2,9 +2,14 @@
 <?= $this->section('content') ?>
 
 <?php
-  $totalGross = array_sum(array_column($payrolls, 'total_gross'));
-  $totalDed   = array_sum(array_column($payrolls, 'total_deductions'));
-  $totalNet   = array_sum(array_column($payrolls, 'total_net'));
+  // When branch filter is active, use branch-specific totals from subqueries
+  $hasBranch  = $selBranch !== '';
+  $totalGross = 0; $totalDed = 0; $totalNet = 0;
+  foreach ($payrolls as $p) {
+      $totalGross += $hasBranch ? (float)$p['branch_gross'] : (float)$p['total_gross'];
+      $totalDed   += $hasBranch ? (float)$p['branch_deductions'] : (float)$p['total_deductions'];
+      $totalNet   += $hasBranch ? (float)$p['branch_net'] : (float)$p['total_net'];
+  }
 ?>
 
 <style>
@@ -24,9 +29,11 @@
         </button>
         <h5 class="mb-0 fw-semibold">Payroll Runs</h5>
     </div>
+    <?php if (can_do('payroll', 'add')): ?>
     <a href="<?= site_url('payroll/create') ?>" class="btn btn-primary btn-sm">
         <i class="fa fa-plus me-1"></i>Generate Payroll
     </a>
+    <?php endif; ?>
 </div>
 
 <!-- Year / Month Filter -->
@@ -52,6 +59,15 @@
             <option value="<?= $num ?>" <?= (string)$selMonth === (string)$num ? 'selected' : '' ?>><?= $name ?></option>
             <?php endforeach; ?>
         </select>
+        <label class="form-label mb-0 fw-medium ms-2">Branch:</label>
+        <select name="branch_id" class="form-select form-select-sm" style="width:160px;">
+            <option value="">All Branches</option>
+            <?php foreach ($branches as $b): ?>
+            <option value="<?= $b['id'] ?>" <?= (string)$selBranch === (string)$b['id'] ? 'selected' : '' ?>>
+                <?= esc($b['name']) ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
         <button class="btn btn-sm btn-primary">
             <i class="fa fa-filter me-1"></i>Filter
         </button>
@@ -66,6 +82,10 @@
         <small class="text-muted">
             <?= $selYear ?>
             <?= $selMonth !== '' ? ' – ' . date('F', mktime(0,0,0,(int)$selMonth,1)) : ' – All Months' ?>
+            <?php if ($selBranch !== ''): ?>
+            <?php $bName = ''; foreach ($branches as $b) { if ((string)$b['id'] === (string)$selBranch) { $bName = $b['name']; break; } } ?>
+            – <?= esc($bName) ?>
+            <?php endif; ?>
         </small>
     </div>
 
@@ -80,6 +100,7 @@
                             <th>Start</th>
                             <th>End</th>
                             <th class="text-end">Working Days</th>
+                            <th class="text-end">Employees</th>
                             <th class="text-end">Gross Pay</th>
                             <th class="text-end">Deductions</th>
                             <th class="text-end">Net Pay</th>
@@ -91,7 +112,9 @@
                     <?php if (empty($payrolls)): ?>
                     <tr><td colspan="10" class="text-center text-muted py-4">
                         No payroll runs found.
+                        <?php if (can_do('payroll', 'add')): ?>
                         <a href="<?= site_url('payroll/create') ?>" class="no-print">Generate one now.</a>
+                        <?php endif; ?>
                     </td></tr>
                     <?php else: ?>
                         <?php foreach ($payrolls as $p): ?>
@@ -105,9 +128,10 @@
                             <td class="small"><?= date('M j', strtotime($p['period_start'])) ?></td>
                             <td class="small"><?= date('M j', strtotime($p['period_end'])) ?></td>
                             <td class="text-end"><?= $p['working_days'] ?></td>
-                            <td class="text-end text-success fw-semibold">₱ <?= number_format($p['total_gross'], 2) ?></td>
-                            <td class="text-end text-danger">₱ <?= number_format($p['total_deductions'], 2) ?></td>
-                            <td class="text-end fw-bold">₱ <?= number_format($p['total_net'], 2) ?></td>
+                            <td class="text-end"><?= $p['employee_count'] ?></td>
+                            <td class="text-end text-success fw-semibold">₱ <?= number_format($hasBranch ? $p['branch_gross'] : $p['total_gross'], 2) ?></td>
+                            <td class="text-end text-danger">₱ <?= number_format($hasBranch ? $p['branch_deductions'] : $p['total_deductions'], 2) ?></td>
+                            <td class="text-end fw-bold">₱ <?= number_format($hasBranch ? $p['branch_net'] : $p['total_net'], 2) ?></td>
                             <td>
                                 <span class="badge <?= $p['status'] === 'finalized' ? 'badge-final' : 'badge-draft' ?>">
                                     <?= ucfirst($p['status']) ?>
@@ -115,11 +139,12 @@
                             </td>
                             <td class="no-print">
                                 <div class="d-flex gap-1">
-                                    <a href="<?= site_url('payroll/view/' . $p['id']) ?>"
+                                    <a href="<?= site_url('payroll/view/' . $p['id']) . '?' . http_build_query(array_filter(['year' => $selYear, 'month' => $selMonth, 'branch_id' => $selBranch], fn($v) => $v !== '')) ?>"
                                        class="btn btn-sm btn-outline-primary" title="View">
                                         <i class="fa fa-eye"></i>
                                     </a>
                                     <?php if ($p['status'] === 'draft'): ?>
+                                    <?php if (can_do('payroll', 'edit')): ?>
                                     <a href="<?= site_url('payroll/finalize/' . $p['id']) ?>"
                                        class="btn btn-sm btn-outline-success" title="Finalize"
                                        data-confirm="Finalize this payroll? This cannot be undone.">
@@ -129,13 +154,16 @@
                                        class="btn btn-sm btn-outline-warning" title="Recalculate">
                                         <i class="fa fa-rotate"></i>
                                     </a>
+                                    <?php endif; ?>
+                                    <?php if (can_do('payroll', 'delete')): ?>
                                     <a href="<?= site_url('payroll/delete/' . $p['id']) ?>"
                                        class="btn btn-sm btn-outline-danger" title="Delete"
                                        data-confirm="Delete this draft payroll?">
                                         <i class="fa fa-trash"></i>
                                     </a>
                                     <?php endif; ?>
-                                    <a href="<?= site_url('payslip/bulk/' . $p['id']) ?>"
+                                    <?php endif; ?>
+                                    <a href="<?= site_url('payslip/bulk/' . $p['id']) . '?' . http_build_query(array_filter(['year' => $selYear, 'month' => $selMonth, 'branch_id' => $selBranch ?: ''], fn($v) => $v !== '' && $v !== 0)) ?>"
                                        class="btn btn-sm btn-outline-secondary" title="Bulk Payslips">
                                         <i class="fa fa-file-invoice"></i>
                                     </a>
@@ -148,7 +176,7 @@
                     <?php if (! empty($payrolls)): ?>
                     <tfoot>
                         <tr class="table-light fw-bold border-top border-2">
-                            <td colspan="5" class="text-end text-muted small pe-3">Totals:</td>
+                            <td colspan="6" class="text-end text-muted small pe-3">Totals:</td>
                             <td class="text-end text-success">₱ <?= number_format($totalGross, 2) ?></td>
                             <td class="text-end text-danger">₱ <?= number_format($totalDed, 2) ?></td>
                             <td class="text-end">₱ <?= number_format($totalNet, 2) ?></td>

@@ -218,15 +218,15 @@
         <div class="summary-grid">
             <div class="summary-item">
                 <div class="summary-label">Total Gross Pay</div>
-                <div class="summary-value text-success">₱ <?= number_format($payroll['total_gross'], 2) ?></div>
+                <div class="summary-value text-success">₱ <?= number_format(round($payroll['total_gross']), 2) ?></div>
             </div>
             <div class="summary-item">
                 <div class="summary-label">Total Deductions</div>
-                <div class="summary-value text-danger">₱ <?= number_format($payroll['total_deductions'], 2) ?></div>
+                <div class="summary-value text-danger">₱ <?= number_format(round($payroll['total_deductions']), 2) ?></div>
             </div>
             <div class="summary-item">
                 <div class="summary-label">Total Net Pay</div>
-                <div class="summary-value text-primary">₱ <?= number_format($payroll['total_net'], 2) ?></div>
+                <div class="summary-value text-primary">₱ <?= number_format(round($payroll['total_net']), 2) ?></div>
             </div>
         </div>
 
@@ -236,9 +236,7 @@
                 <tr>
                     <th>Employee</th>
                     <th class="text-center">Days<br/>Worked</th>
-                    <th class="text-center">OT<br/>Hours</th>
                     <th class="text-end">Basic Pay</th>
-                    <th class="text-end">OT Pay</th>
                     <th class="text-end">Gross</th>
                     <th class="text-end">SSS</th>
                     <th class="text-end">PhilHealth</th>
@@ -262,16 +260,14 @@
                                 <?= $d['whole_days'] ?>W <?= $d['half_days'] ?>H <?= $d['absent_days'] ?>A
                             </div>
                         </td>
-                        <td class="text-center"><?= $d['overtime_hours'] > 0 ? $d['overtime_hours'] : '—' ?></td>
-                        <td class="text-end">₱ <?= number_format($d['basic_pay'], 2) ?></td>
-                        <td class="text-end"><?= $d['overtime_pay'] > 0 ? '₱ ' . number_format($d['overtime_pay'], 2) : '—' ?></td>
-                        <td class="text-end text-success">₱ <?= number_format($d['gross_pay'], 2) ?></td>
-                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format($d['sss_deduction'], 2) ?></td>
-                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format($d['philhealth_deduction'], 2) ?></td>
-                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format($d['pagibig_deduction'], 2) ?></td>
-                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format($d['benefits_deduction'] ?? 0, 2) ?></td>
-                        <td class="text-end text-danger" style="font-weight: 600;">₱ <?= number_format($d['total_deductions'], 2) ?></td>
-                        <td class="text-end" style="font-weight: bold; color: #0d6efd;">₱ <?= number_format($d['net_pay'], 2) ?></td>
+                        <td class="text-end">₱ <?= number_format(round($d['basic_pay']), 2) ?></td>
+                        <td class="text-end text-success">₱ <?= number_format(round($d['gross_pay']), 2) ?></td>
+                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format(round($d['sss_deduction']), 2) ?></td>
+                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format(round($d['philhealth_deduction']), 2) ?></td>
+                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format(round($d['pagibig_deduction']), 2) ?></td>
+                        <td class="text-end text-danger" style="font-size: 0.8rem;">₱ <?= number_format(round($d['benefits_deduction'] ?? 0), 2) ?></td>
+                        <td class="text-end text-danger" style="font-weight: 600;">₱ <?= number_format(round($d['total_deductions']), 2) ?></td>
+                        <td class="text-end" style="font-weight: bold; color: #0d6efd;">₱ <?= number_format(round($d['net_pay']), 2) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -279,10 +275,10 @@
             <tfoot>
                 <tr>
                     <td colspan="5">Totals</td>
-                    <td class="text-end">₱ <?= number_format($payroll['total_gross'], 2) ?></td>
+                    <td class="text-end">₱ <?= number_format(round($payroll['total_gross']), 2) ?></td>
                     <td class="text-end" colspan="4"></td>
-                    <td class="text-end">₱ <?= number_format($payroll['total_deductions'], 2) ?></td>
-                    <td class="text-end">₱ <?= number_format($payroll['total_net'], 2) ?></td>
+                    <td class="text-end">₱ <?= number_format(round($payroll['total_deductions']), 2) ?></td>
+                    <td class="text-end">₱ <?= number_format(round($payroll['total_net']), 2) ?></td>
                 </tr>
             </tfoot>
         </table>

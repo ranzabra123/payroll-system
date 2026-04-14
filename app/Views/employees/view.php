@@ -57,9 +57,11 @@
     <!-- Right side -->
     <div class="col-lg-8">
         <div class="d-flex gap-2 mb-3">
+            <?php if (can_do('employees', 'edit')): ?>
             <a href="<?= site_url('employees/edit/' . $employee['id']) ?>" class="btn btn-primary btn-sm">
                 <i class="fa fa-pen-to-square me-1"></i>Edit
             </a>
+            <?php endif; ?>
             <a href="<?= site_url('employees/dtr/' . $employee['id']) ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="fa fa-calendar-days me-1"></i>DTR
             </a>

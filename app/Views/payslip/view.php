@@ -90,7 +90,7 @@
                         </tr>
                         <tr>
                             <td class="text-muted">Monthly Salary</td>
-                            <td class="fw-semibold">: ₱ <?= number_format($detail['monthly_salary'], 2) ?></td>
+                            <td class="fw-semibold">: ₱ <?= number_format(round($detail['monthly_salary']), 2) ?></td>
                         </tr>
                     </table>
                 </div>
@@ -129,19 +129,20 @@
                 <h6 class="fw-bold text-uppercase small text-muted mb-3">Earnings</h6>
 
                 <div class="payslip-row">
-                    <span>Basic Pay</span>
-                    <span>₱ <?= number_format($detail['basic_pay'], 2) ?></span>
+                    <span>Basic Pay (Semi-monthly)</span>
+                    <span>₱ <?= number_format(round($detail['basic_pay']), 2) ?></span>
                 </div>
+
+                <?php if (($detail['special_adjustments'] ?? 0) != 0): ?>
                 <div class="payslip-row">
-                    <span>Overtime Pay</span>
-                    <span class="<?= $detail['overtime_pay'] > 0 ? '' : 'text-muted' ?>">
-                        <?= $detail['overtime_pay'] > 0 ? '₱ ' . number_format($detail['overtime_pay'], 2) : '—' ?>
-                    </span>
+                    <span>Special Adjustments</span>
+                    <span>₱ <?= number_format(round($detail['special_adjustments']), 2) ?></span>
                 </div>
+                <?php endif; ?>
 
                 <div class="payslip-row payslip-total mt-2">
                     <span class="fw-bold">GROSS PAY</span>
-                    <span class="text-success fw-bold">₱ <?= number_format($detail['gross_pay'], 2) ?></span>
+                    <span class="text-success fw-bold">₱ <?= number_format(round($detail['gross_pay']), 2) ?></span>
                 </div>
             </div>
 
@@ -149,34 +150,62 @@
             <div class="col-md-6 p-3 border-bottom">
                 <h6 class="fw-bold text-uppercase small text-muted mb-3">Deductions</h6>
 
+                <?php
+                    // Absent deduction
+                    $absentDed = (float)($detail['absent_deduction'] ?? 0);
+                    // For legacy records, compute dynamically if absent_deduction not stored
+                    if ($absentDed == 0 && (float)$detail['absent_days'] > 0 && (int)$detail['working_days'] > 0) {
+                        $absentDed = round(((float)$detail['monthly_salary'] / 2) / (int)$detail['working_days'] * (float)$detail['absent_days']);
+                    }
+                ?>
+
+                <?php if ($absentDed > 0): ?>
                 <div class="payslip-row">
-                    <span>SSS</span>
-                    <span class="text-danger">₱ <?= number_format($detail['sss_deduction'], 2) ?></span>
-                </div>
-                <div class="payslip-row">
-                    <span>PhilHealth</span>
-                    <span class="text-danger">₱ <?= number_format($detail['philhealth_deduction'], 2) ?></span>
-                </div>
-                <div class="payslip-row">
-                    <span>Pag-IBIG</span>
-                    <span class="text-danger">₱ <?= number_format($detail['pagibig_deduction'], 2) ?></span>
-                </div>
-                <?php if ($detail['other_deductions'] > 0): ?>
-                <div class="payslip-row">
-                    <span>Other Deductions</span>
-                    <span class="text-danger">₱ <?= number_format($detail['other_deductions'], 2) ?></span>
+                    <span>Absent (<?= (int)$detail['absent_days'] ?> day<?= (int)$detail['absent_days'] > 1 ? 's' : '' ?>)</span>
+                    <span class="text-danger">₱ <?= number_format(round($absentDed), 2) ?></span>
                 </div>
                 <?php endif; ?>
-                <?php if (($detail['benefits_deduction'] ?? 0) > 0): ?>
+
+                <?php if ($detail['sss_deduction'] > 0): ?>
                 <div class="payslip-row">
-                    <span>Benefits</span>
-                    <span class="text-danger">₱ <?= number_format($detail['benefits_deduction'], 2) ?></span>
+                    <span>SSS</span>
+                    <span class="text-danger">₱ <?= number_format(round($detail['sss_deduction']), 2) ?></span>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($detail['philhealth_deduction'] > 0): ?>
+                <div class="payslip-row">
+                    <span>PhilHealth</span>
+                    <span class="text-danger">₱ <?= number_format(round($detail['philhealth_deduction']), 2) ?></span>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($detail['pagibig_deduction'] > 0): ?>
+                <div class="payslip-row">
+                    <span>Pag-IBIG</span>
+                    <span class="text-danger">₱ <?= number_format(round($detail['pagibig_deduction']), 2) ?></span>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($detail['other_deductions'] > 0): ?>
+                <?php if (! empty($empDeds)):
+                    foreach ($empDeds as $ed): ?>
+                <div class="payslip-row">
+                    <span><?= esc($ed['description']) ?></span>
+                    <span class="text-danger">₱ <?= number_format(round($ed['amount_per_cutoff']), 2) ?></span>
+                </div>
+                <?php endforeach;
+                else: ?>
+                <div class="payslip-row">
+                    <span>Other Deductions</span>
+                    <span class="text-danger">₱ <?= number_format(round($detail['other_deductions']), 2) ?></span>
+                </div>
+                <?php endif; ?>
                 <?php endif; ?>
 
                 <div class="payslip-row payslip-total mt-2">
                     <span class="fw-bold">TOTAL DEDUCTIONS</span>
-                    <span class="text-danger fw-bold">₱ <?= number_format($detail['total_deductions'], 2) ?></span>
+                    <span class="text-danger fw-bold">₱ <?= number_format(round($detail['total_deductions']), 2) ?></span>
                 </div>
             </div>
         </div>
@@ -185,7 +214,7 @@
         <div class="p-3 text-center" style="background:#f8fafc;border-radius:0 0 8px 8px;">
             <div class="text-muted small mb-1">NET PAY</div>
             <div class="fw-bold" style="font-size:2rem;color:var(--primary);">
-                ₱ <?= number_format($detail['net_pay'], 2) ?>
+                ₱ <?= number_format(round($detail['net_pay']), 2) ?>
             </div>
 
             <div class="row mt-3 border-top pt-2">

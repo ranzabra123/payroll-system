@@ -148,8 +148,14 @@
 <div class="container py-4">
     <div class="d-flex align-items-center justify-content-between mb-3 no-print flex-wrap gap-2">
         <h5 class="mb-0"><?= esc($title) ?> (<?= count($details) ?> payslips)</h5>
-        <div class="d-flex align-items-center gap-2">
-            <input type="text" id="payslip-search" class="form-control form-control-sm" placeholder="Search employee…" style="width:220px;" oninput="filterPayslips(this.value)">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <select id="branch-filter" class="form-select form-select-sm" style="width:180px;" onchange="filterByBranch(this.value)">
+                <option value="">All Branches</option>
+                <?php foreach ($branches as $b): ?>
+                <option value="<?= esc($b['id']) ?>"><?= esc($b['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <input type="text" id="payslip-search" class="form-control form-control-sm" placeholder="Search employee…" style="width:200px;" oninput="filterPayslips()">
             <button onclick="window.print()" class="btn btn-primary btn-sm">
                 <i class="fa fa-print me-1"></i>Print All
             </button>
@@ -168,7 +174,7 @@
     ?>
     <div class="payslip-grid <?= ($page < $pagesNeeded - 1) ? 'page-break-after' : '' ?>">
         <?php foreach ($pageDetails as $d): ?>
-        <div class="payslip-wrapper" data-name="<?= esc(strtolower($d['full_name'])) ?>">
+        <div class="payslip-wrapper" data-name="<?= esc(strtolower($d['full_name'])) ?>" data-branch="<?= esc($d['branch_id'] ?? '') ?>">
         <div class="payslip-header">
             <div class="row align-items-center">
                 <div class="col">
@@ -198,8 +204,8 @@
                 <div class="col-md-6">
                     <table class="table table-sm table-borderless mb-0" style="font-size:0.5rem;">
                         <tr><td class="text-muted" style="width:70px;">Period</td><td style="font-size:0.5rem;">: <?= date('M j', strtotime($payroll['period_start'])) ?>–<?= date('M j, Y', strtotime($payroll['period_end'])) ?></td></tr>
-                        <tr><td class="text-muted">Salary</td><td class="fw-semibold" style="font-size:0.5rem;">: ₱ <?= number_format($d['monthly_salary'], 2) ?></td></tr>
-                        <tr><td class="text-muted">Days</td><td style="font-size:0.5rem;">: <?= $d['days_worked'] ?>/<?= $d['working_days'] ?></td></tr>
+                        <tr><td class="text-muted">Salary</td><td class="fw-semibold" style="font-size:0.5rem;">: ₱ <?= number_format(round($d['monthly_salary']), 2) ?></td></tr>
+                        <tr><td class="text-muted">Days</td><td style="font-size:0.5rem;">: <?= $d['days_worked'] ?></td></tr>
                     </table>
                 </div>
             </div>
@@ -207,23 +213,39 @@
         <div class="row g-0">
             <div class="col-md-6" style="padding: 0.15rem 0.25rem; border-right: 1px solid #dee2e6;">
                 <h6 class="text-uppercase small text-muted mb-2" style="font-size:0.52rem;margin-bottom:0.08rem!important;">Earnings</h6>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Basic Pay</span><span>₱ <?= number_format($d['basic_pay'], 2) ?></span></div>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>OT Pay</span><span><?= $d['overtime_pay'] > 0 ? '₱ ' . number_format($d['overtime_pay'], 2) : '—' ?></span></div>
-                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>GROSS</span><span class="text-success">₱ <?= number_format($d['gross_pay'], 2) ?></span></div>
+                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Basic Pay</span><span>₱ <?= number_format(round($d['basic_pay']), 2) ?></span></div>
+
+                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>GROSS</span><span class="text-success">₱ <?= number_format(round($d['gross_pay']), 2) ?></span></div>
             </div>
             <div class="col-md-6" style="padding: 0.15rem 0.25rem;">
                 <h6 class="text-uppercase small text-muted mb-2" style="font-size:0.52rem;margin-bottom:0.08rem!important;">Deductions</h6>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>SSS</span><span class="text-danger">₱ <?= number_format($d['sss_deduction'], 2) ?></span></div>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>PhilHealth</span><span class="text-danger">₱ <?= number_format($d['philhealth_deduction'], 2) ?></span></div>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Pag-IBIG</span><span class="text-danger">₱ <?= number_format($d['pagibig_deduction'], 2) ?></span></div>
-                <?php if (($d['other_deductions'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Other Ded.</span><span class="text-danger">₱ <?= number_format($d['other_deductions'], 2) ?></span></div><?php endif; ?>
-                <?php if (($d['benefits_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Benefits</span><span class="text-danger">₱ <?= number_format($d['benefits_deduction'], 2) ?></span></div><?php endif; ?>
-                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>DED.</span><span class="text-danger">₱ <?= number_format($d['total_deductions'], 2) ?></span></div>
+                <?php
+                    $dAbsent = (float)($d['absent_deduction'] ?? 0);
+                    if ($dAbsent == 0 && (float)$d['absent_days'] > 0 && (int)$d['working_days'] > 0) {
+                        $dAbsent = round(((float)$d['monthly_salary'] / 2) / (int)$d['working_days'] * (float)$d['absent_days']);
+                    }
+                ?>
+                <?php if ($dAbsent > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Absent</span><span class="text-danger">₱ <?= number_format(round($dAbsent), 2) ?></span></div><?php endif; ?>
+                <?php if (($d['sss_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>SSS</span><span class="text-danger">₱ <?= number_format(round($d['sss_deduction']), 2) ?></span></div><?php endif; ?>
+                <?php if (($d['philhealth_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>PhilHealth</span><span class="text-danger">₱ <?= number_format(round($d['philhealth_deduction']), 2) ?></span></div><?php endif; ?>
+                <?php if (($d['pagibig_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Pag-IBIG</span><span class="text-danger">₱ <?= number_format(round($d['pagibig_deduction']), 2) ?></span></div><?php endif; ?>
+                <?php if (($d['other_deductions'] ?? 0) > 0): ?>
+                    <?php
+                    $empDeds = $empDedsMap[$d['employee_id']] ?? [];
+                    if ($empDeds):
+                        foreach ($empDeds as $ed): ?>
+                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span><?= esc($ed['description']) ?></span><span class="text-danger">₱ <?= number_format(round($ed['amount_per_cutoff']), 2) ?></span></div>
+                        <?php endforeach;
+                    else: ?>
+                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Other Ded.</span><span class="text-danger">₱ <?= number_format(round($d['other_deductions']), 2) ?></span></div>
+                    <?php endif; ?>
+                <?php endif; ?>
+                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>DED.</span><span class="text-danger">₱ <?= number_format(round($d['total_deductions']), 2) ?></span></div>
             </div>
         </div>
         <div style="padding: 0.1rem 0.2rem; text-align: center; border-top: 1px solid #dee2e6;">
             <div class="text-muted" style="font-size:0.5rem;">NET PAY</div>
-            <div class="fw-bold" style="font-size:0.8rem;color:var(--primary);">₱ <?= number_format($d['net_pay'], 2) ?></div>
+            <div class="fw-bold" style="font-size:0.8rem;color:var(--primary);">₱ <?= number_format(round($d['net_pay']), 2) ?></div>
         </div>
         </div> <!-- close payslip-wrapper -->
     <?php endforeach; ?>
@@ -233,11 +255,23 @@
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous"/>
 <script>
-function filterPayslips(query) {
-    const q = query.trim().toLowerCase();
+var activeFilter = { branch: '', name: '' };
+
+function filterPayslips() {
+    activeFilter.name = (document.getElementById('payslip-search').value || '').trim().toLowerCase();
+    applyFilters();
+}
+
+function filterByBranch(branchId) {
+    activeFilter.branch = branchId.toString();
+    applyFilters();
+}
+
+function applyFilters() {
     document.querySelectorAll('.payslip-wrapper').forEach(function(el) {
-        const name = (el.dataset.name || '').toLowerCase();
-        el.style.display = (!q || name.includes(q)) ? '' : 'none';
+        var nameMatch  = !activeFilter.name   || (el.dataset.name   || '').includes(activeFilter.name);
+        var branchMatch = !activeFilter.branch || (el.dataset.branch || '') === activeFilter.branch;
+        el.style.display = (nameMatch && branchMatch) ? '' : 'none';
     });
 }
 </script>

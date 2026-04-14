@@ -14,7 +14,10 @@ class EmployeeModel extends Model
     protected $allowedFields = [
         'employee_code', 'full_name', 'position', 'department', 'branch_id',
         'monthly_salary', 'daily_rate', 'date_hired', 'gender',
-        'sss_number', 'philhealth_number', 'pagibig_number', 'tin_number', 'status',
+        'sss_number', 'sss_contribution',
+        'philhealth_number', 'philhealth_contribution',
+        'pagibig_number', 'pagibig_contribution',
+        'tin_number', 'status',
     ];
 
     protected $useTimestamps = true;
@@ -69,7 +72,7 @@ class EmployeeModel extends Model
         if ($branchId) {
             $this->where('branch_id', $branchId);
         }
-        return $this->orderBy('full_name', 'ASC')->findAll();
+        return $this->orderBy('FIELD(status,"active","inactive")', 'ASC', false)->orderBy('full_name', 'ASC')->findAll();
     }
 
     /**

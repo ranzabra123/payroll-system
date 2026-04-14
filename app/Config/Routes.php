@@ -54,6 +54,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('payroll/generate',            'PayrollController::create');
     $routes->post('payroll/generate',           'PayrollController::generate');
     $routes->get('payroll/view/(:num)',         'PayrollController::view/$1');
+    $routes->get('payroll/poll/(:num)',         'PayrollController::pollData/$1');
     $routes->get('payroll/print/(:num)',        'PayrollController::print/$1');
     $routes->get('payroll/finalize/(:num)',     'PayrollController::finalize/$1');
     $routes->get('payroll/recalculate/(:num)',  'PayrollController::recalculate/$1');
@@ -72,7 +73,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('deductions/edit/(:num)',           'DeductionsController::edit/$1');
     $routes->post('deductions/update/(:num)',        'DeductionsController::update/$1');
     $routes->get('deductions/delete/(:num)',         'DeductionsController::delete/$1');
-    $routes->get('deductions/complete/(:num)',       'DeductionsController::markComplete/$1');
+    $routes->post('deductions/toggle/(:num)',         'DeductionsController::toggle/$1');
 
     // ---- Benefits ----
     $routes->get('benefits',                            'BenefitsController::index');

@@ -83,7 +83,7 @@
                 </div>
             </div>
 
-            <h6 class="text-muted mb-3 border-bottom pb-2">Government Numbers</h6>
+            <h6 class="text-muted mb-3 border-bottom pb-2">Government Numbers &amp; Contributions</h6>
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label class="form-label">SSS Number</label>
@@ -91,15 +91,57 @@
                            value="<?= esc(old('sss_number')) ?>" placeholder="XX-XXXXXXX-X"/>
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label">SSS Contribution (₱/month)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Employee</span>
+                        <input type="number" name="sss_contribution" id="sss_contribution"
+                               class="form-control contrib-emp" step="0.01" min="0"
+                               value="<?= esc(old('sss_contribution', '0.00')) ?>"
+                               placeholder="0.00" oninput="syncEmployer(this,'sss_employer_preview')"/>
+                        <span class="input-group-text">Employer</span>
+                        <input type="text" id="sss_employer_preview" class="form-control contrib-emr"
+                               readonly placeholder="auto" tabindex="-1"/>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label">PhilHealth Number</label>
                     <input type="text" name="philhealth_number" class="form-control font-monospace"
                            value="<?= esc(old('philhealth_number')) ?>" placeholder="XX-XXXXXXXXXXX-X"/>
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label">PhilHealth Contribution (₱/month)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Employee</span>
+                        <input type="number" name="philhealth_contribution" id="philhealth_contribution"
+                               class="form-control contrib-emp" step="0.01" min="0"
+                               value="<?= esc(old('philhealth_contribution', '0.00')) ?>"
+                               placeholder="0.00" oninput="syncEmployer(this,'philhealth_employer_preview')"/>
+                        <span class="input-group-text">Employer</span>
+                        <input type="text" id="philhealth_employer_preview" class="form-control contrib-emr"
+                               readonly placeholder="auto" tabindex="-1"/>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label">Pag-IBIG Number</label>
                     <input type="text" name="pagibig_number" class="form-control font-monospace"
                            value="<?= esc(old('pagibig_number')) ?>" placeholder="XXXX-XXXX-XXXX"/>
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label">Pag-IBIG Contribution (₱/month)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Employee</span>
+                        <input type="number" name="pagibig_contribution" id="pagibig_contribution"
+                               class="form-control contrib-emp" step="0.01" min="0"
+                               value="<?= esc(old('pagibig_contribution', '0.00')) ?>"
+                               placeholder="0.00" oninput="syncEmployer(this,'pagibig_employer_preview')"/>
+                        <span class="input-group-text">Employer</span>
+                        <input type="text" id="pagibig_employer_preview" class="form-control contrib-emr"
+                               readonly placeholder="auto" tabindex="-1"/>
+                    </div>
+                </div>
+
                 <div class="col-md-6">
                     <label class="form-label">TIN</label>
                     <input type="text" name="tin_number" class="form-control font-monospace"
@@ -118,3 +160,19 @@
 </div>
 
 <?= $this->endSection() ?>
+
+<script>
+function syncEmployer(empInput, previewId) {
+    var val = parseFloat(empInput.value) || 0;
+    document.getElementById(previewId).value = val > 0 ? '₱ ' + val.toFixed(2) : '';
+}
+// Initialise on page load for old() values
+document.addEventListener('DOMContentLoaded', function () {
+    [['sss_contribution','sss_employer_preview'],
+     ['philhealth_contribution','philhealth_employer_preview'],
+     ['pagibig_contribution','pagibig_employer_preview']].forEach(function(pair) {
+        var inp = document.getElementById(pair[0]);
+        if (inp) syncEmployer(inp, pair[1]);
+    });
+});
+</script>

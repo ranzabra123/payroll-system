@@ -7,6 +7,7 @@ use App\Models\EmployeeModel;
 use App\Models\SalaryHistoryModel;
 use App\Models\AttendanceModel;
 use App\Models\AuditLogModel;
+use App\Models\BenefitModel;
 
 /**
  * EmployeesController – full CRUD for employee records.
@@ -32,9 +33,13 @@ class EmployeesController extends Controller
         if ($search) {
             $employees = $this->model->search($search, $branchId);
         } elseif ($branchId) {
-            $employees = $this->model->where('branch_id', $branchId)->orderBy('full_name', 'ASC')->findAll();
+            $employees = $this->model->where('branch_id', $branchId)
+                ->orderBy('FIELD(status,"active","inactive")', 'ASC', false)
+                ->orderBy('full_name', 'ASC')->findAll();
         } else {
-            $employees = $this->model->orderBy('full_name', 'ASC')->findAll();
+            $employees = $this->model
+                ->orderBy('FIELD(status,"active","inactive")', 'ASC', false)
+                ->orderBy('full_name', 'ASC')->findAll();
         }
 
         $branches = (new \App\Models\BranchModel())->getActiveList();
@@ -88,13 +93,22 @@ class EmployeesController extends Controller
             'date_hired'        => $this->request->getPost('date_hired'),
             'gender'            => $this->request->getPost('gender') ?: null,
             'sss_number'        => $this->request->getPost('sss_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'sss_contribution'  => (float) $this->request->getPost('sss_contribution'),
             'philhealth_number' => $this->request->getPost('philhealth_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'philhealth_contribution' => (float) $this->request->getPost('philhealth_contribution'),
             'pagibig_number'    => $this->request->getPost('pagibig_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'pagibig_contribution'    => (float) $this->request->getPost('pagibig_contribution'),
             'tin_number'        => $this->request->getPost('tin_number', FILTER_SANITIZE_SPECIAL_CHARS),
             'status'            => $this->request->getPost('status'),
         ];
 
         $id = $this->model->insert($data);
+
+        // Create per-employee benefit records
+        $benefitModel = new BenefitModel();
+        $benefitModel->upsertForEmployee($id, 'SSS',       $data['sss_contribution']);
+        $benefitModel->upsertForEmployee($id, 'PhilHealth', $data['philhealth_contribution']);
+        $benefitModel->upsertForEmployee($id, 'Pag-IBIG',  $data['pagibig_contribution']);
         $this->audit->logAction('Employees', 'create', $id, null, $data,
             "Added employee '{$data['full_name']}' ({$data['employee_code']}) — {$data['department']} — ₱" . number_format($data['monthly_salary'], 2) . "/mo");
 
@@ -160,19 +174,22 @@ class EmployeesController extends Controller
         $userBranch = user_branch_id();
         $branchId = $userBranch ?? ((int) $this->request->getPost('branch_id') ?: null);
         $data = [
-            'full_name'         => $this->request->getPost('full_name', FILTER_SANITIZE_SPECIAL_CHARS),
-            'position'          => $this->request->getPost('position', FILTER_SANITIZE_SPECIAL_CHARS),
-            'department'        => $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS),
-            'branch_id'         => $branchId,
-            'monthly_salary'    => $monthly,
-            'daily_rate'        => round($monthly / 22, 4),
-            'date_hired'        => $this->request->getPost('date_hired'),
-            'gender'            => $this->request->getPost('gender') ?: null,
-            'sss_number'        => $this->request->getPost('sss_number', FILTER_SANITIZE_SPECIAL_CHARS),
-            'philhealth_number' => $this->request->getPost('philhealth_number', FILTER_SANITIZE_SPECIAL_CHARS),
-            'pagibig_number'    => $this->request->getPost('pagibig_number', FILTER_SANITIZE_SPECIAL_CHARS),
-            'tin_number'        => $this->request->getPost('tin_number', FILTER_SANITIZE_SPECIAL_CHARS),
-            'status'            => $this->request->getPost('status'),
+            'full_name'               => $this->request->getPost('full_name', FILTER_SANITIZE_SPECIAL_CHARS),
+            'position'                => $this->request->getPost('position', FILTER_SANITIZE_SPECIAL_CHARS),
+            'department'              => $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS),
+            'branch_id'               => $branchId,
+            'monthly_salary'          => $monthly,
+            'daily_rate'              => round($monthly / 22, 4),
+            'date_hired'              => $this->request->getPost('date_hired'),
+            'gender'                  => $this->request->getPost('gender') ?: null,
+            'sss_number'              => $this->request->getPost('sss_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'sss_contribution'        => (float) $this->request->getPost('sss_contribution'),
+            'philhealth_number'       => $this->request->getPost('philhealth_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'philhealth_contribution' => (float) $this->request->getPost('philhealth_contribution'),
+            'pagibig_number'          => $this->request->getPost('pagibig_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'pagibig_contribution'    => (float) $this->request->getPost('pagibig_contribution'),
+            'tin_number'              => $this->request->getPost('tin_number', FILTER_SANITIZE_SPECIAL_CHARS),
+            'status'                  => $this->request->getPost('status'),
         ];
 
         // Track salary change
@@ -188,6 +205,13 @@ class EmployeesController extends Controller
         }
 
         $this->model->update($id, $data);
+
+        // Sync per-employee benefit records
+        $benefitModel = new BenefitModel();
+        $benefitModel->upsertForEmployee($id, 'SSS',       $data['sss_contribution']);
+        $benefitModel->upsertForEmployee($id, 'PhilHealth', $data['philhealth_contribution']);
+        $benefitModel->upsertForEmployee($id, 'Pag-IBIG',  $data['pagibig_contribution']);
+
         $summaryParts = ["Updated employee #{$id} '{$data['full_name']}'"];
         if ((float)$employee['monthly_salary'] !== (float)$data['monthly_salary']) {
             $summaryParts[] = 'salary: ₱' . number_format((float)$employee['monthly_salary'], 2) . ' → ₱' . number_format((float)$data['monthly_salary'], 2);

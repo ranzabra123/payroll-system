@@ -182,7 +182,6 @@
                         <th>Cutoff</th>
                         <th class="text-center">Days Worked</th>
                         <th class="text-end">Basic Pay</th>
-                        <th class="text-end">OT Pay</th>
                         <th class="text-end">Gross</th>
                         <th class="text-end">Total Ded.</th>
                         <th class="text-end fw-bold">Net Pay</th>
@@ -201,7 +200,6 @@
                     <td><span class="badge bg-secondary"><?= $row['cutoff'] == 1 ? '1st' : '2nd' ?></span></td>
                     <td class="text-center"><?= $row['days_worked'] ?>/<?= $row['working_days'] ?></td>
                     <td class="text-end">₱ <?= number_format($row['basic_pay'], 2) ?></td>
-                    <td class="text-end"><?= $row['overtime_pay'] > 0 ? '₱ ' . number_format($row['overtime_pay'], 2) : '—' ?></td>
                     <td class="text-end text-success">₱ <?= number_format($row['gross_pay'], 2) ?></td>
                     <td class="text-end text-danger">₱ <?= number_format($row['total_deductions'], 2) ?></td>
                     <td class="text-end fw-bold">₱ <?= number_format($row['net_pay'], 2) ?></td>

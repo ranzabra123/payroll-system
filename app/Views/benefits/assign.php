@@ -37,6 +37,7 @@
 
 <div class="row g-3">
     <!-- Add Assignment Form -->
+    <?php if (can_do('benefits', 'add')): ?>
     <div class="col-lg-5">
         <div class="card">
             <div class="card-header fw-semibold py-2">
@@ -122,6 +123,7 @@
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Current Assignments -->
     <div class="col-lg-7">
@@ -174,12 +176,14 @@
                                 </span>
                             </td>
                             <td>
+                                <?php if (can_do('benefits', 'delete')): ?>
                                 <a href="<?= site_url('benefits/assignment-delete/' . $a['id']) ?>"
                                    class="btn btn-sm btn-outline-danger"
                                    onclick="return confirm('Remove this assignment?')"
                                    title="Delete">
                                     <i class="fa fa-trash"></i>
                                 </a>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; ?>

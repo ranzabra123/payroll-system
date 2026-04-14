@@ -3,9 +3,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0 fw-semibold">Benefits</h5>
+    <?php if (can_do('benefits', 'add')): ?>
     <a href="<?= site_url('benefits/create') ?>" class="btn btn-primary btn-sm">
         <i class="fa fa-plus me-1"></i>Add Benefit
     </a>
+    <?php endif; ?>
 </div>
 
 <?php if (session()->getFlashdata('success')): ?>
@@ -58,13 +60,17 @@
                             <a href="<?= site_url('benefits/assign/' . $b['id']) ?>"
                                class="btn btn-sm btn-outline-info" title="Manage Assignments">
                                <i class="fa fa-users"></i></a>
+                            <?php if (can_do('benefits', 'edit')): ?>
                             <a href="<?= site_url('benefits/edit/' . $b['id']) ?>"
                                class="btn btn-sm btn-outline-primary" title="Edit">
                                <i class="fa fa-pen-to-square"></i></a>
+                            <?php endif; ?>
+                            <?php if (can_do('benefits', 'delete')): ?>
                             <a href="<?= site_url('benefits/delete/' . $b['id']) ?>"
                                class="btn btn-sm btn-outline-danger" title="Delete"
                                onclick="return confirm('Delete this benefit and all its assignments?')">
                                <i class="fa fa-trash"></i></a>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>

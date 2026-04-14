@@ -3,9 +3,11 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h5 class="mb-0 fw-semibold"><i class="fa fa-calendar-day me-2 text-primary"></i>Special Day Adjustments</h5>
+    <?php if (can_do('special_days', 'add')): ?>
     <a href="<?= site_url('special-days/create') ?>" class="btn btn-primary btn-sm">
         <i class="fa fa-plus me-1"></i>Add Adjustment
     </a>
+    <?php endif; ?>
 </div>
 
 <!-- Filter bar -->
@@ -61,9 +63,11 @@
         <div class="text-center text-muted py-5">
             <i class="fa fa-calendar-day fa-3x mb-3 opacity-25 d-block"></i>
             <p class="mb-0">No special day adjustments found.</p>
+            <?php if (can_do('special_days', 'add')): ?>
             <a href="<?= site_url('special-days/create') ?>" class="btn btn-primary btn-sm mt-3">
                 <i class="fa fa-plus me-1"></i>Add First Adjustment
             </a>
+            <?php endif; ?>
         </div>
         <?php else: ?>
         <div class="table-responsive">
@@ -119,16 +123,20 @@
                     <td class="text-center">
                         <?php if ($row['status'] === 'pending'): ?>
                         <div class="d-flex gap-1 justify-content-center">
+                            <?php if (can_do('special_days', 'edit')): ?>
                             <a href="<?= site_url('special-days/edit/' . $row['id']) ?>"
                                class="btn btn-sm btn-outline-primary" title="Edit">
                                 <i class="fa fa-pen"></i>
                             </a>
+                            <?php endif; ?>
+                            <?php if (can_do('special_days', 'delete')): ?>
                             <a href="<?= site_url('special-days/delete/' . $row['id']) ?>"
                                class="btn btn-sm btn-outline-danger"
                                data-confirm="Delete this special day adjustment?"
                                title="Delete">
                                 <i class="fa fa-trash"></i>
                             </a>
+                            <?php endif; ?>
                         </div>
                         <?php else: ?>
                         <span class="text-muted small">—</span>

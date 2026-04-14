@@ -216,51 +216,112 @@ class BenefitsController extends Controller
 
     public function summary()
     {
+        $year        = $this->request->getGet('year')         ?? date('Y');
         $month       = $this->request->getGet('month')        ?? '';
-        $cutoffF     = $this->request->getGet('cutoff')       ?? '';
-        $benefitType = $this->request->getGet('benefit_type') ?? '';
+        $branchId    = $this->request->getGet('branch_id')    ?? '';
         $search      = $this->request->getGet('q')            ?? '';
+        $benefitType = $this->request->getGet('benefit_type') ?? '';
 
-        if ($month === '') {
-            $month = date('Y-m');
+        $branches = (new \App\Models\BranchModel())->getActiveList();
+
+        // Sanitise year/month
+        $yearInt  = (int) $year;
+        $monthInt = $month !== '' ? (int) $month : 0;
+
+        $builder = \Config\Database::connect()->table('payroll_details pd')
+            ->select([
+                'pd.sss_deduction',
+                'pd.philhealth_deduction',
+                'pd.pagibig_deduction',
+                'e.full_name',
+                'e.employee_code',
+                'e.department',
+                'e.branch_id',
+                'br.name AS branch_name',
+                'p.payroll_month',
+                'p.cutoff',
+            ])
+            ->join('payroll p',    'p.id = pd.payroll_id')
+            ->join('employees e',  'e.id = pd.employee_id')
+            ->join('branches br',  'br.id = e.branch_id', 'left');
+
+        if ($yearInt > 0) {
+            $builder->where("SUBSTRING(p.payroll_month, 1, 4) = {$yearInt}");
+        }
+        if ($monthInt > 0) {
+            $monthPadded = str_pad($monthInt, 2, '0', STR_PAD_LEFT);
+            $builder->where("SUBSTRING(p.payroll_month, 6, 2) = '{$monthPadded}'");
+        }
+        if ($branchId !== '') {
+            $builder->where('e.branch_id', (int) $branchId);
+        }
+        if ($search !== '') {
+            $builder->groupStart()
+                        ->like('e.full_name', $search)
+                        ->orLike('e.employee_code', $search)
+                    ->groupEnd();
         }
 
-        $benefitTypes = $this->model
-            ->where('is_active', 1)
-            ->orderBy('name')
-            ->findColumn('name') ?? [];
+        // Filter out rows where the selected benefit type is zero
+        if ($benefitType === 'sss') {
+            $builder->where('pd.sss_deduction >', 0);
+        } elseif ($benefitType === 'philhealth') {
+            $builder->where('pd.philhealth_deduction >', 0);
+        } elseif ($benefitType === 'pagibig') {
+            $builder->where('pd.pagibig_deduction >', 0);
+        } else {
+            // No type filter: exclude rows where ALL three are zero
+            $builder->groupStart()
+                        ->where('pd.sss_deduction >', 0)
+                        ->orWhere('pd.philhealth_deduction >', 0)
+                        ->orWhere('pd.pagibig_deduction >', 0)
+                    ->groupEnd();
+        }
 
-        $rows = $this->assignModel->getSummaryRows([
-            'month'        => $month,
-            'cutoff'       => $cutoffF,
-            'benefit_type' => $benefitType,
-            'search'       => $search,
-        ]);
+        $rows = $builder
+            ->orderBy('br.name', 'ASC')
+            ->orderBy('e.full_name', 'ASC')
+            ->orderBy('p.payroll_month', 'ASC')
+            ->get()->getResultArray();
 
-        $grouped       = [];
-        $grandEmpShare = 0.0;
-        $grandEmrShare = 0.0;
+        // Determine which benefit columns have any data
+        $hasSss  = false;
+        $hasPh   = false;
+        $hasPi   = false;
+        $totSssEmp = $totSssEmr = 0.0;
+        $totPhEmp  = $totPhEmr  = 0.0;
+        $totPiEmp  = $totPiEmr  = 0.0;
 
         foreach ($rows as $r) {
-            $type = $r['benefit_name'];
-            if (! isset($grouped[$type])) {
-                $grouped[$type] = ['rows' => [], 'emp_total' => 0.0, 'emr_total' => 0.0];
-            }
-            $grouped[$type]['rows'][]      = $r;
-            $grouped[$type]['emp_total']  += (float) $r['employee_share'];
-            $grouped[$type]['emr_total']  += (float) $r['employer_share'];
-            $grandEmpShare += (float) $r['employee_share'];
-            $grandEmrShare += (float) $r['employer_share'];
+            $sss = (float) $r['sss_deduction'];
+            $ph  = (float) $r['philhealth_deduction'];
+            $pi  = (float) $r['pagibig_deduction'];
+            // Only show columns relevant to selected benefit type
+            if (($benefitType === '' || $benefitType === 'sss') && $sss > 0) { $hasSss = true; $totSssEmp += $sss; $totSssEmr += $sss; }
+            if (($benefitType === '' || $benefitType === 'philhealth') && $ph > 0) { $hasPh  = true; $totPhEmp  += $ph;  $totPhEmr  += $ph;  }
+            if (($benefitType === '' || $benefitType === 'pagibig') && $pi > 0) { $hasPi  = true; $totPiEmp  += $pi;  $totPiEmr  += $pi;  }
         }
 
         return view('benefits/summary', [
-            'title'        => 'Benefits Summary',
-            'filters'      => ['month' => $month, 'cutoff' => $cutoffF, 'benefit_type' => $benefitType, 'search' => $search],
-            'benefitTypes' => $benefitTypes,
-            'grouped'      => $grouped,
-            'grandEmpShare' => $grandEmpShare,
-            'grandEmrShare' => $grandEmrShare,
-            'grandTotal'    => $grandEmpShare + $grandEmrShare,
+            'title'      => 'Benefits Summary',
+            'rows'       => $rows,
+            'branches'   => $branches,
+            'hasSss'     => $hasSss,
+            'hasPh'      => $hasPh,
+            'hasPi'      => $hasPi,
+            'totSssEmp'  => $totSssEmp,
+            'totSssEmr'  => $totSssEmr,
+            'totPhEmp'   => $totPhEmp,
+            'totPhEmr'   => $totPhEmr,
+            'totPiEmp'   => $totPiEmp,
+            'totPiEmr'   => $totPiEmr,
+            'filters'    => [
+                'year'         => $year,
+                'month'        => $month,
+                'branch_id'    => $branchId,
+                'search'       => $search,
+                'benefit_type' => $benefitType,
+            ],
         ]);
     }
 }

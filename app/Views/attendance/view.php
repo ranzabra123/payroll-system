@@ -51,7 +51,7 @@
                             $eq = match($rec['attendance_type']) {
                                 'whole_day' => 1.0,
                                 'half_am','half_pm' => 0.5,
-                                default => 0,
+                                default => 0.0,
                             };
                             $totalDays += $eq;
                             $totalOT   += (float)$rec['overtime_hours'];
@@ -67,6 +67,7 @@
                             'half_am'   => '<span class="badge att-badge-half">Half AM</span>',
                             'half_pm'   => '<span class="badge att-badge-half">Half PM</span>',
                             'absent'    => '<span class="badge att-badge-absent">Absent</span>',
+                            'day_off'   => '<span class="badge bg-secondary">Day Off</span>',
                             default     => esc($rec['attendance_type']),
                         }; ?>
                         <?php elseif ($dow >= 6): ?>

@@ -10,8 +10,10 @@ use App\Models\AttendanceModel;
 use App\Models\DeductionConfigModel;
 use App\Models\DepartmentModel;
 use App\Models\SpecialDayModel;
+use App\Models\BenefitModel;
 use App\Models\BenefitAssignmentModel;
 use App\Models\EmployeeDeductionModel;
+use App\Models\DeductionHistoryModel;
 use App\Models\AuditLogModel;
 
 /**
@@ -33,27 +35,46 @@ class PayrollController extends Controller
     /** List all payroll runs. */
     public function index()
     {
-        $year  = $this->request->getGet('year')  ?? '';
-        $month = $this->request->getGet('month') ?? '';
+        $year     = $this->request->getGet('year')      ?? '';
+        $month    = $this->request->getGet('month')     ?? '';
+        $branchId = $this->request->getGet('branch_id') ?? '';
 
         // Default year to current year if nothing selected
         if ($year === '') {
             $year = date('Y');
         }
 
-        $payrolls = $this->model->getAllWithCreator($year, $month);
+        $branches = (new \App\Models\BranchModel())->getActiveList();
+        $payrolls = $this->model->getAllWithCreator($year, $month, $branchId);
         return view('payroll/index', [
-            'title'    => 'Payroll',
-            'payrolls' => $payrolls,
-            'selYear'  => $year,
-            'selMonth' => $month,
+            'title'     => 'Payroll',
+            'payrolls'  => $payrolls,
+            'selYear'   => $year,
+            'selMonth'  => $month,
+            'selBranch' => $branchId,
+            'branches'  => $branches,
         ]);
     }
 
     /** Show form to generate a new payroll. */
     public function create()
     {
-        return view('payroll/create', ['title' => 'Generate Payroll']);
+        $month = $this->request->getGet('payroll_month') ?? date('Y-m');
+        if (! preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $month = date('Y-m');
+        }
+
+        $firstCutoff = $this->model
+            ->where('payroll_month', $month)
+            ->where('cutoff', 1)
+            ->where('status', 'finalized')
+            ->first();
+
+        return view('payroll/create', [
+            'title'               => 'Generate Payroll',
+            'selectedMonth'       => $month,
+            'firstCutoffFinalized' => (bool) $firstCutoff,
+        ]);
     }
 
     /** Generate (store) payroll for a cutoff. */
@@ -83,10 +104,9 @@ class PayrollController extends Controller
             return redirect()->back()->with('error', 'No active employees found.');
         }
 
-        $deductions        = (new DeductionConfigModel())->getActiveConfigsKeyed();
         $attModel          = new AttendanceModel();
         $deptWdMap         = (new DepartmentModel())->getWorkingDaysMap();
-        $benefitModel      = new BenefitAssignmentModel();
+        $benefitModel      = new BenefitModel();
         $empDeductionModel = new EmployeeDeductionModel();
 
         // Gather special days applicable to this period, grouped by employee
@@ -133,13 +153,15 @@ class PayrollController extends Controller
                 $appliedSpecialIds[] = $sd['id'];
             }
 
-            // Benefit deductions for this employee and cutoff
-            $benefitAssignments = $benefitModel->getForEmployee($emp['id'], $emp['department'], $cutoff);
-            $benefitsDeduction  = 0.0;
-            foreach ($benefitAssignments as $ba) {
-                $share = (float) $ba['default_employee_share'];
-                // 'both' = split monthly amount across two payrolls
-                $benefitsDeduction += ($ba['cutoff'] === 'both') ? $share / 2 : $share;
+            // Government contributions from employee record.
+            // Only deduct on cutoff 2 (the 30th / end-of-month run).
+            $sssAmt = 0.0;
+            $phAmt  = 0.0;
+            $piAmt  = 0.0;
+            if ($cutoff === 2) {
+                $sssAmt = (float) ($emp['sss_contribution']      ?? 0);
+                $phAmt  = (float) ($emp['philhealth_contribution'] ?? 0);
+                $piAmt  = (float) ($emp['pagibig_contribution']   ?? 0);
             }
 
             // Employee-specific deductions (Cash Advance, loans, etc.)
@@ -149,7 +171,10 @@ class PayrollController extends Controller
                 $otherDeductions += (float) $ed['amount_per_cutoff'];
             }
 
-            $computed = PayrollDetailModel::compute($emp, $attendance, $deductions, $empWorkingDays, $specialAdjustment, $benefitsDeduction, $otherDeductions);
+            $computed = PayrollDetailModel::compute(
+                $emp, $attendance, $empWorkingDays,
+                $specialAdjustment, $sssAmt, $phAmt, $piAmt, $otherDeductions
+            );
 
             $computed['payroll_id']  = $payrollId;
             $computed['employee_id'] = $emp['id'];
@@ -157,14 +182,28 @@ class PayrollController extends Controller
             $this->detailModel->insert($computed);
 
             // Reduce remaining_balance on applied employee deductions
+            $histModel = new DeductionHistoryModel();
             foreach ($empDeductions as $ed) {
-                $applied     = (float) $ed['amount_per_cutoff'];
-                $newBalance  = max(0.0, (float) $ed['remaining_balance'] - $applied);
-                $updateData  = ['remaining_balance' => $newBalance];
+                $applied    = (float) $ed['amount_per_cutoff'];
+                $balBefore  = (float) $ed['remaining_balance'];
+                $newBalance = max(0.0, $balBefore - $applied);
+                $updateData = ['remaining_balance' => $newBalance];
                 if ($newBalance <= 0) {
-                    $updateData['status'] = 'inactive';
+                    $updateData['status'] = 'completed';
                 }
                 $empDeductionModel->update($ed['id'], $updateData);
+
+                // Record history entry
+                $histModel->insert([
+                    'employee_deduction_id' => $ed['id'],
+                    'payroll_id'            => $payrollId,
+                    'payroll_cutoff'        => $cutoff,
+                    'period_start'          => $period['start'],
+                    'period_end'            => $period['end'],
+                    'amount_deducted'       => $applied,
+                    'balance_before'        => $balBefore,
+                    'balance_after'         => $newBalance,
+                ]);
             }
 
             $totalGross += $computed['gross_pay'];
@@ -177,9 +216,9 @@ class PayrollController extends Controller
 
         // --- Update payroll totals ---
         $this->model->update($payrollId, [
-            'total_gross'      => round($totalGross, 2),
-            'total_deductions' => round($totalDed, 2),
-            'total_net'        => round($totalNet, 2),
+            'total_gross'      => round($totalGross),
+            'total_deductions' => round($totalDed),
+            'total_net'        => round($totalNet),
         ]);
 
         $cutoffLabel = $cutoff === '1' ? '1st Cutoff' : '2nd Cutoff';
@@ -199,12 +238,69 @@ class PayrollController extends Controller
             return redirect()->to(site_url('payroll'))->with('error', 'Payroll not found.');
         }
 
-        $details = $this->detailModel->getByPayroll($id);
+        $branchId = (int) ($this->request->getGet('branch_id') ?? 0);
+        $selYear  = $this->request->getGet('year')  ?? '';
+        $selMonth = $this->request->getGet('month') ?? '';
+        $branches = (new \App\Models\BranchModel())->getActiveList();
+        $details  = $this->detailModel->getByPayroll($id, $branchId);
+
+        // Compute summary from filtered details
+        $filteredGross = array_sum(array_column($details, 'gross_pay'));
+        $filteredDed   = array_sum(array_column($details, 'total_deductions'));
+        $filteredNet   = array_sum(array_column($details, 'net_pay'));
 
         return view('payroll/view', [
-            'title'   => PayrollModel::periodLabel($payroll),
-            'payroll' => $payroll,
-            'details' => $details,
+            'title'         => PayrollModel::periodLabel($payroll),
+            'payroll'       => $payroll,
+            'details'       => $details,
+            'branches'      => $branches,
+            'selBranch'     => $branchId,
+            'selYear'       => $selYear,
+            'selMonth'      => $selMonth,
+            'filteredGross' => $filteredGross,
+            'filteredDed'   => $filteredDed,
+            'filteredNet'   => $filteredNet,
+        ]);
+    }
+
+    /** Return JSON snapshot of payroll totals + detail rows for live polling. */
+    public function pollData(int $id)
+    {
+        $payroll = $this->model->find($id);
+        if (! $payroll) {
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+        }
+
+        $branchId = (int) ($this->request->getGet('branch_id') ?? 0);
+        $details  = $this->detailModel->getByPayroll($id, $branchId);
+        $detailRows = [];
+        foreach ($details as $d) {
+            $absentDed = (float)($d['absent_deduction'] ?? 0);
+            if ($absentDed == 0 && ($d['benefits_deduction'] ?? 0) > 0) {
+                $absentDed = (float)$d['benefits_deduction'];
+            }
+            $detailRows[] = [
+                'id'                   => (int) $d['id'],
+                'gross_pay'            => (float) $d['gross_pay'],
+                'absent_deduction'     => $absentDed,
+                'sss_deduction'        => (float) $d['sss_deduction'],
+                'philhealth_deduction' => (float) $d['philhealth_deduction'],
+                'pagibig_deduction'    => (float) $d['pagibig_deduction'],
+                'other_deductions'     => (float) $d['other_deductions'],
+                'total_deductions'     => (float) $d['total_deductions'],
+                'net_pay'              => (float) $d['net_pay'],
+            ];
+        }
+
+        $filteredGross = array_sum(array_column($details, 'gross_pay'));
+        $filteredDed   = array_sum(array_column($details, 'total_deductions'));
+        $filteredNet   = array_sum(array_column($details, 'net_pay'));
+
+        return $this->response->setJSON([
+            'total_gross'      => $filteredGross,
+            'total_deductions' => $filteredDed,
+            'total_net'        => $filteredNet,
+            'details'          => $detailRows,
         ]);
     }
 
@@ -235,6 +331,10 @@ class PayrollController extends Controller
         }
 
         $this->model->update($id, ['status' => 'finalized']);
+
+        // Re-enable all active deductions so next payroll run picks them up
+        (new EmployeeDeductionModel())->where('status', 'active')->set('is_enabled', 1)->update();
+
         $periodLabel = \App\Models\PayrollModel::periodLabel($payroll);
         $this->audit->logAction('Payroll', 'finalize', $id, null, null,
             "Finalized payroll: {$periodLabel}");
@@ -271,11 +371,11 @@ class PayrollController extends Controller
             return redirect()->to(site_url('payroll'))->with('error', 'Cannot recalculate.');
         }
 
-        $deductions   = (new DeductionConfigModel())->getActiveConfigsKeyed();
-        $attModel     = new AttendanceModel();
-        $emp          = new EmployeeModel();
-        $deptWdMap    = (new DepartmentModel())->getWorkingDaysMap();
-        $benefitModel = new BenefitAssignmentModel();
+        $attModel        = new AttendanceModel();
+        $emp             = new EmployeeModel();
+        $deptWdMap       = (new DepartmentModel())->getWorkingDaysMap();
+        $empDeductionModel = new EmployeeDeductionModel();
+        $cutoff          = (int) $payroll['cutoff'];
 
         $details = $this->detailModel->getByPayroll($id);
         $totalGross = $totalDed = $totalNet = 0;
@@ -292,30 +392,84 @@ class PayrollController extends Controller
             $empWorkingDays = $deptWd ? (int) ceil($deptWd / 2) : $payroll['working_days'];
             $prevSpecial    = (float) ($detail['special_adjustments'] ?? 0);
 
-            // Recompute benefit deductions
-            $benefitAssignments = $benefitModel->getForEmployee(
-                $employee['id'], $employee['department'], (int) $payroll['cutoff']
-            );
-            $benefitsDeduction = 0.0;
-            foreach ($benefitAssignments as $ba) {
-                $share = (float) $ba['default_employee_share'];
-                $benefitsDeduction += ($ba['cutoff'] === 'both') ? $share / 2 : $share;
+            // Government contributions from employee record (cutoff 2 only)
+            $sssAmt = 0.0;
+            $phAmt  = 0.0;
+            $piAmt  = 0.0;
+            if ($cutoff === 2) {
+                $sssAmt = (float) ($employee['sss_contribution']       ?? 0);
+                $phAmt  = (float) ($employee['philhealth_contribution'] ?? 0);
+                $piAmt  = (float) ($employee['pagibig_contribution']    ?? 0);
+            }
+
+            // Employee-specific deductions — reverse any existing history first, then reapply
+            $histModel     = new DeductionHistoryModel();
+            $allDeductions = $empDeductionModel
+                ->where('employee_id', $employee['id'])
+                ->where('status !=', 'cancelled')
+                ->findAll();
+
+            foreach ($allDeductions as $ed) {
+                $prevHist = $histModel->where('employee_deduction_id', $ed['id'])
+                                      ->where('payroll_id', $id)
+                                      ->first();
+                if ($prevHist) {
+                    // Restore previous balance
+                    $restored = (float) $prevHist['balance_before'];
+                    $empDeductionModel->update($ed['id'], [
+                        'remaining_balance' => $restored,
+                        'status'            => 'active',
+                    ]);
+                    $histModel->where('id', $prevHist['id'])->delete();
+                }
+            }
+
+            $empDeductions   = $empDeductionModel->getActiveForCutoff($employee['id'], $cutoff, $payroll['period_end']);
+            $otherDeductions = 0.0;
+            foreach ($empDeductions as $ed) {
+                $otherDeductions += (float) $ed['amount_per_cutoff'];
             }
 
             $computed = PayrollDetailModel::compute(
-                $employee, $attendance, $deductions, $empWorkingDays, $prevSpecial, $benefitsDeduction
+                $employee, $attendance, $empWorkingDays,
+                $prevSpecial, $sssAmt, $phAmt, $piAmt, $otherDeductions
             );
 
             $this->detailModel->update($detail['id'], $computed);
+
+            // Reapply deductions and record history
+            foreach ($empDeductions as $ed) {
+                // Reload fresh balance after possible restore above
+                $fresh      = $empDeductionModel->find($ed['id']);
+                $applied    = (float) $ed['amount_per_cutoff'];
+                $balBefore  = (float) $fresh['remaining_balance'];
+                $newBalance = max(0.0, $balBefore - $applied);
+                $upd        = ['remaining_balance' => $newBalance];
+                if ($newBalance <= 0) {
+                    $upd['status'] = 'completed';
+                }
+                $empDeductionModel->update($ed['id'], $upd);
+                $histModel->insert([
+                    'employee_deduction_id' => $ed['id'],
+                    'payroll_id'            => $id,
+                    'payroll_cutoff'        => $cutoff,
+                    'period_start'          => $payroll['period_start'],
+                    'period_end'            => $payroll['period_end'],
+                    'amount_deducted'       => $applied,
+                    'balance_before'        => $balBefore,
+                    'balance_after'         => $newBalance,
+                ]);
+            }
+
             $totalGross += $computed['gross_pay'];
             $totalDed   += $computed['total_deductions'];
             $totalNet   += $computed['net_pay'];
         }
 
         $this->model->update($id, [
-            'total_gross'      => round($totalGross, 2),
-            'total_deductions' => round($totalDed, 2),
-            'total_net'        => round($totalNet, 2),
+            'total_gross'      => round($totalGross),
+            'total_deductions' => round($totalDed),
+            'total_net'        => round($totalNet),
         ]);
 
         $this->audit->logAction('Payroll', 'recalculate', $id);

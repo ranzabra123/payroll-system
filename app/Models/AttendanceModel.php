@@ -23,7 +23,7 @@ class AttendanceModel extends Model
     protected $validationRules = [
         'employee_id'     => 'required|integer',
         'attendance_date' => 'required|valid_date[Y-m-d]',
-        'attendance_type' => 'required|in_list[whole_day,half_am,half_pm,absent]',
+        'attendance_type' => 'required|in_list[whole_day,half_am,half_pm,absent,day_off]',
         'overtime_hours'  => 'permit_empty|decimal|greater_than_equal_to[0]',
     ];
 
@@ -107,6 +107,9 @@ class AttendanceModel extends Model
                     break;
                 case 'absent':
                     $summary['absent_days']++;
+                    break;
+                case 'day_off':
+                    // Day off: excluded from salary calculation entirely
                     break;
             }
             $summary['overtime_hours'] += (float) $row['overtime_hours'];

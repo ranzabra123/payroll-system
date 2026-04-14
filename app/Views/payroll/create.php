@@ -20,38 +20,41 @@
 
             <div class="mb-4">
                 <label class="form-label fw-medium">Payroll Month <span class="text-danger">*</span></label>
-                <input type="month" name="payroll_month" class="form-control"
-                       value="<?= old('payroll_month', date('Y-m')) ?>" required/>
+                <input type="month" name="payroll_month" id="payroll_month" class="form-control"
+                       value="<?= esc($selectedMonth) ?>" required
+                       onchange="window.location.href='<?= site_url('payroll/create') ?>?payroll_month='+this.value"/>
                 <div class="form-text">Select the year and month for this payroll run.</div>
             </div>
 
             <div class="mb-4">
                 <label class="form-label fw-medium">Cut-off Period <span class="text-danger">*</span></label>
                 <div class="d-flex gap-3">
+                    <?php if (! $firstCutoffFinalized): ?>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="cutoff" id="c1" value="1"
-                               <?= old('cutoff', '1') === '1' ? 'checked' : '' ?> required/>
+                        <input class="form-check-input" type="radio" name="cutoff" id="c1" value="1" checked required/>
                         <label class="form-check-label" for="c1">
                             <span class="fw-semibold">1st Cutoff</span><br/>
                             <span class="text-muted small">1 – 15 of the month</span>
                         </label>
                     </div>
+                    <?php else: ?>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="cutoff" id="c2" value="2"
-                               <?= old('cutoff') === '2' ? 'checked' : '' ?> required/>
+                        <input class="form-check-input" type="radio" name="cutoff" id="c2" value="2" checked required/>
                         <label class="form-check-label" for="c2">
                             <span class="fw-semibold">2nd Cutoff</span><br/>
                             <span class="text-muted small">16 – end of the month</span>
                         </label>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <div class="alert alert-info py-2 small">
+            <?php if ($firstCutoffFinalized): ?>
+            <div class="alert alert-warning py-2 small">
                 <i class="fa fa-circle-info me-2"></i>
-                Deductions (SSS, PhilHealth, Pag-IBIG) are computed at half the monthly rate per cutoff.
-                OT rate is 1.25× the hourly rate.
+                Deductions (SSS, PhilHealth, Pag-IBIG) will be deducted in this cut-off!
             </div>
+            <?php endif; ?>
 
             <div class="d-flex gap-2 mt-3">
                 <button type="submit" class="btn btn-primary">

@@ -34,8 +34,14 @@ class Dashboard extends Controller
         // Latest payroll
         $latestPayroll = $payModel->orderBy('period_start', 'DESC')->first();
 
-        // Today's attendance count
-        $todayAttendance = $attModel->where('attendance_date', date('Y-m-d'))->countAllResults();
+        // Today's attendance count — scoped by branch for non-admins
+        $attBuilder = $attModel->db->table('attendance')
+            ->where('attendance_date', date('Y-m-d'));
+        if (! $isAdmin && $userBranchId !== null) {
+            $attBuilder->join('employees', 'employees.id = attendance.employee_id')
+                       ->where('employees.branch_id', $userBranchId);
+        }
+        $todayAttendance = $attBuilder->countAllResults();
 
         // Recent audit logs
         $recentLogs = $auditModel->getRecent(10);

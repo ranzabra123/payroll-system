@@ -3,9 +3,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0 fw-semibold">Employees <?php if ($search): ?><span class="text-muted small">– "<?= esc($search) ?>"</span><?php endif; ?></h5>
+    <?php if (can_do('employees', 'add')): ?>
     <a href="<?= site_url('employees/create') ?>" class="btn btn-primary btn-sm">
         <i class="fa fa-user-plus me-1"></i>Add Employee
     </a>
+    <?php endif; ?>
 </div>
 
 <!-- Search -->
@@ -83,19 +85,23 @@
                                    class="btn btn-sm btn-outline-info" title="View">
                                     <i class="fa fa-eye"></i>
                                 </a>
+                                <?php if (can_do('employees', 'edit')): ?>
                                 <a href="<?= site_url('employees/edit/' . $emp['id']) ?>"
                                    class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="fa fa-pen-to-square"></i>
                                 </a>
+                                <?php endif; ?>
                                 <a href="<?= site_url('employees/dtr/' . $emp['id']) ?>"
                                    class="btn btn-sm btn-outline-secondary" title="DTR">
                                     <i class="fa fa-calendar-days"></i>
                                 </a>
+                                <?php if (can_do('employees', 'delete')): ?>
                                 <a href="<?= site_url('employees/delete/' . $emp['id']) ?>"
                                    class="btn btn-sm btn-outline-danger" title="Delete"
                                    data-confirm="Delete employee <?= esc($emp['full_name']) ?>?">
                                     <i class="fa fa-trash"></i>
                                 </a>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>

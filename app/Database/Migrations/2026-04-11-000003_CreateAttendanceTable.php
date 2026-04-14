@@ -23,10 +23,10 @@ class CreateAttendanceTable extends Migration
             'attendance_date' => [
                 'type' => 'DATE',
             ],
-            // whole_day | half_am | half_pm | absent
+            // whole_day | half_am | half_pm | absent | day_off
             'attendance_type' => [
                 'type'       => 'ENUM',
-                'constraint' => ['whole_day', 'half_am', 'half_pm', 'absent'],
+                'constraint' => ['whole_day', 'half_am', 'half_pm', 'absent', 'day_off'],
                 'default'    => 'whole_day',
             ],
             'overtime_hours' => [

@@ -12,7 +12,7 @@ class EmployeeDeductionModel extends Model
     protected $allowedFields = [
         'employee_id', 'type', 'description', 'total_amount',
         'amount_per_cutoff', 'cutoff', 'remaining_balance',
-        'status', 'start_date', 'notes',
+        'status', 'is_enabled', 'start_date', 'notes',
     ];
 
     protected $useTimestamps = true;
@@ -107,7 +107,26 @@ class EmployeeDeductionModel extends Model
                         ->orWhere('cutoff', 'both')
                     ->groupEnd()
                     ->where('status', 'active')
+                    ->where('is_enabled', 1)
                     ->where('remaining_balance >', 0)
+                    ->where('start_date <=', $periodEnd)
+                    ->findAll();
+    }
+
+    /**
+     * Get deductions for payslip display (no balance/status filter — amounts may
+     * already be reduced after payroll generation).
+     */
+    public function getForPayslipDisplay(int $empId, int $payrollCutoff, string $periodEnd): array
+    {
+        $cutoffVal = $payrollCutoff === 1 ? '15' : '30';
+
+        return $this->where('employee_id', $empId)
+                    ->groupStart()
+                        ->where('cutoff', $cutoffVal)
+                        ->orWhere('cutoff', 'both')
+                    ->groupEnd()
+                    ->where('amount_per_cutoff >', 0)
                     ->where('start_date <=', $periodEnd)
                     ->findAll();
     }

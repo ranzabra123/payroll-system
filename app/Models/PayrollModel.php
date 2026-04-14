@@ -24,10 +24,23 @@ class PayrollModel extends Model
     /**
      * Get payroll with creator info, optionally filtered by year and/or month.
      */
-    public function getAllWithCreator(string $year = '', string $month = ''): array
+    public function getAllWithCreator(string $year = '', string $month = '', string $branchId = ''): array
     {
+        $bid = $branchId !== '' ? (int) $branchId : 0;
+
+        // Employee count subquery — branch-scoped when branch filter active
+        $empCount = $bid
+            ? "(SELECT COUNT(*) FROM payroll_details pd JOIN employees e ON e.id = pd.employee_id WHERE pd.payroll_id = p.id AND e.branch_id = {$bid})"
+            : '(SELECT COUNT(*) FROM payroll_details pd WHERE pd.payroll_id = p.id)';
+
+        // Branch-specific financial subqueries (NULL when no branch filter)
+        $branchSelect = $bid ? ",
+            (SELECT COALESCE(SUM(pd.gross_pay),0)        FROM payroll_details pd JOIN employees e ON e.id = pd.employee_id WHERE pd.payroll_id = p.id AND e.branch_id = {$bid}) AS branch_gross,
+            (SELECT COALESCE(SUM(pd.total_deductions),0) FROM payroll_details pd JOIN employees e ON e.id = pd.employee_id WHERE pd.payroll_id = p.id AND e.branch_id = {$bid}) AS branch_deductions,
+            (SELECT COALESCE(SUM(pd.net_pay),0)          FROM payroll_details pd JOIN employees e ON e.id = pd.employee_id WHERE pd.payroll_id = p.id AND e.branch_id = {$bid}) AS branch_net" : '';
+
         $builder = $this->db->table('payroll p')
-            ->select('p.*, u.full_name AS created_by_name')
+            ->select("p.*, u.full_name AS created_by_name, {$empCount} AS employee_count" . $branchSelect)
             ->join('users u', 'u.id = p.created_by', 'left');
 
         if ($year !== '') {
@@ -35,6 +48,13 @@ class PayrollModel extends Model
         }
         if ($month !== '') {
             $builder->where('MONTH(p.period_start)', $month);
+        }
+        if ($bid) {
+            $builder->where("EXISTS (
+                SELECT 1 FROM payroll_details pd
+                JOIN employees e ON e.id = pd.employee_id
+                WHERE pd.payroll_id = p.id AND e.branch_id = {$bid}
+            )");
         }
 
         return $builder->orderBy('p.period_start', 'DESC')

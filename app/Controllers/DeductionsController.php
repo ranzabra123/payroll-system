@@ -4,6 +4,8 @@ namespace App\Controllers;
 
 use CodeIgniter\Controller;
 use App\Models\EmployeeDeductionModel;
+use App\Models\DeductionHistoryModel;
+use App\Models\PayrollModel;
 use App\Models\EmployeeModel;
 use App\Models\AuditLogModel;
 
@@ -94,12 +96,15 @@ class DeductionsController extends Controller
                          ? ceil($deduction['remaining_balance'] / $deduction['amount_per_cutoff'])
                          : 0;
 
+        $history = (new DeductionHistoryModel())->getForDeduction($id);
+
         return view('deductions/view', [
             'title'       => 'Deduction Detail',
             'deduction'   => $deduction,
             'paidAmount'  => $paidAmount,
             'progressPct' => $progressPct,
             'termsLeft'   => $termsLeft,
+            'history'     => $history,
         ]);
     }
 
@@ -178,18 +183,105 @@ class DeductionsController extends Controller
         return redirect()->to(site_url('deductions'))->with('success', 'Deduction deleted.');
     }
 
-    public function markComplete(int $id)
+    /** Toggle is_enabled ON/OFF for a deduction (AJAX POST). */
+    public function toggle(int $id)
     {
         $deduction = $this->model->find($id);
         if (! $deduction) {
-            return redirect()->to(site_url('deductions'))->with('error', 'Not found.');
+            return $this->response->setJSON(['success' => false, 'message' => 'Not found.']);
         }
 
-        $this->model->update($id, ['status' => 'completed', 'remaining_balance' => 0]);
-        $this->audit->logAction('Deductions', 'complete', $id, $deduction, null,
-            "Marked deduction #{$id} ({$deduction['type']}) as completed");
+        $newVal     = $deduction['is_enabled'] ? 0 : 1;
+        $histModel  = new DeductionHistoryModel();
+        $payModel   = new PayrollModel();
 
-        return redirect()->to(site_url('deductions'))->with('success', 'Deduction marked as completed.');
+        // Map deduction cutoff to payroll cutoff number
+        $cutoffMap = ['15' => 1, '30' => 2, 'both' => null];
+        $dedCutoff = $cutoffMap[$deduction['cutoff']] ?? null;
+
+        // Look for an existing DRAFT payroll that matches this deduction's cutoff
+        $draftQuery = $payModel->where('status', 'draft');
+        if ($dedCutoff !== null) {
+            $draftQuery->where('cutoff', $dedCutoff);
+        }
+        $draftPayroll = $draftQuery->orderBy('created_at', 'DESC')->first();
+
+        if ($draftPayroll) {
+            $histEntry = $histModel
+                ->where('employee_deduction_id', $id)
+                ->where('payroll_id', $draftPayroll['id'])
+                ->first();
+
+            if ($newVal === 0 && $histEntry) {
+                // Turning OFF — restore balance and delete history
+                $this->model->update($id, [
+                    'remaining_balance' => $histEntry['balance_before'],
+                    'status'            => 'active',
+                    'is_enabled'        => 0,
+                ]);
+                $histModel->where('id', $histEntry['id'])->delete();
+
+                // Recalculate payroll totals for this payroll
+                $this->_recalculatePayrollTotals($draftPayroll['id']);
+
+            } elseif ($newVal === 1 && ! $histEntry) {
+                // Turning ON and payroll already generated but deduction not yet applied — apply now
+                $fresh   = $this->model->find($id);
+                $applied = (float) $fresh['amount_per_cutoff'];
+                $balBefore  = (float) $fresh['remaining_balance'];
+                $newBalance = max(0.0, $balBefore - $applied);
+                $upd = ['remaining_balance' => $newBalance, 'is_enabled' => 1];
+                if ($newBalance <= 0) {
+                    $upd['status'] = 'completed';
+                }
+                $this->model->update($id, $upd);
+                $histModel->insert([
+                    'employee_deduction_id' => $id,
+                    'payroll_id'            => $draftPayroll['id'],
+                    'payroll_cutoff'        => $draftPayroll['cutoff'],
+                    'period_start'          => $draftPayroll['period_start'],
+                    'period_end'            => $draftPayroll['period_end'],
+                    'amount_deducted'       => $applied,
+                    'balance_before'        => $balBefore,
+                    'balance_after'         => $newBalance,
+                ]);
+                $this->_recalculatePayrollTotals($draftPayroll['id']);
+
+            } else {
+                // No matching history or already in desired state — just flip flag
+                $this->model->update($id, ['is_enabled' => $newVal]);
+            }
+        } else {
+            $this->model->update($id, ['is_enabled' => $newVal]);
+        }
+
+        $this->audit->logAction('Deductions', 'toggle', $id, $deduction, ['is_enabled' => $newVal],
+            "Deduction #{$id} ({$deduction['type']}) " . ($newVal ? 'enabled' : 'disabled'));
+
+        $updated = $this->model->find($id);
+        return $this->response->setJSON([
+            'success'           => true,
+            'is_enabled'        => (int) $newVal,
+            'remaining_balance' => (float) $updated['remaining_balance'],
+            'total_amount'      => (float) $updated['total_amount'],
+            'status'            => $updated['status'],
+        ]);
+    }
+
+    /** Recalculate and update payroll header totals from payroll_details. */
+    private function _recalculatePayrollTotals(int $payrollId): void
+    {
+        $db  = \Config\Database::connect();
+        $row = $db->table('payroll_details')
+                  ->select('SUM(gross_pay) AS g, SUM(total_deductions) AS d, SUM(net_pay) AS n')
+                  ->where('payroll_id', $payrollId)
+                  ->get()->getRowArray();
+
+        (new PayrollModel())->update($payrollId, [
+            'total_gross'      => round((float)($row['g'] ?? 0)),
+            'total_deductions' => round((float)($row['d'] ?? 0)),
+            'total_net'        => round((float)($row['n'] ?? 0)),
+        ]);
     }
 
     public function summary()
