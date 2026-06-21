@@ -7,7 +7,7 @@ use App\Models\PayrollDetailModel;
 use App\Models\PayrollModel;
 use App\Models\AuditLogModel;
 use App\Models\EmployeeDeductionModel;
-
+use App\Models\DeductionHistoryModel;
 /**
  * PayslipController – individual payslip view (print-ready).
  */
@@ -26,9 +26,9 @@ class PayslipController extends Controller
         (new AuditLogModel())->logAction('Payslip', 'view', $detailId);
 
         $cutoff    = (int) $payroll['cutoff'];
-        $empDedModel = new EmployeeDeductionModel();
-        $empDeds   = $empDedModel->getForPayslipDisplay(
-            (int) $detail['employee_id'], $cutoff, $payroll['period_end']
+        $empDeds   = (new DeductionHistoryModel())->getForPayslip(
+            (int) $detail['employee_id'], (int) $payroll['id'], $cutoff,
+            $payroll['period_start'], $payroll['period_end']
         );
 
         return view('payslip/view', [
@@ -52,14 +52,17 @@ class PayslipController extends Controller
         $branches    = (new \App\Models\BranchModel())->getActiveList();
         $cutoff      = (int) $payroll['cutoff'];
         $periodEnd   = $payroll['period_end'];
-        $empDedModel = new EmployeeDeductionModel();
+
 
         // Build a map of employee_id => [deduction records] for payslip display
         $empDedsMap = [];
         foreach ($details as $d) {
             $empId = (int) $d['employee_id'];
             if (! isset($empDedsMap[$empId])) {
-                $empDedsMap[$empId] = $empDedModel->getForPayslipDisplay($empId, $cutoff, $periodEnd);
+                $empDedsMap[$empId] = (new DeductionHistoryModel())->getForPayslip(
+                    $empId, (int) $payroll['id'], $cutoff,
+                    $payroll['period_start'], $periodEnd
+                );
             }
         }
 

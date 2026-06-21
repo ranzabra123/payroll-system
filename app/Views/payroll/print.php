@@ -255,9 +255,10 @@
                             <div class="employee-code"><?= esc($d['employee_code']) ?></div>
                         </td>
                         <td class="text-center">
-                            <?= $d['days_worked'] ?>/<?= $d['working_days'] ?>
+                            <?= (float)$d['days_worked'] ?>/<?= $d['working_days'] ?>
+                            <?php $effAbs = round((float)$d['working_days'] - (float)$d['days_worked'], 2); ?>
                             <div style="font-size: 0.7rem; color: #666;">
-                                <?= $d['whole_days'] ?>W <?= $d['half_days'] ?>H <?= $d['absent_days'] ?>A
+                                <?= $d['whole_days'] ?>W <?= $d['half_days'] ?>H <?= $effAbs > 0 ? number_format($effAbs, 1) : '0' ?>A
                             </div>
                         </td>
                         <td class="text-end">₱ <?= number_format(round($d['basic_pay']), 2) ?></td>

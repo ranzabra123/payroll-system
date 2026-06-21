@@ -31,9 +31,26 @@ if (! function_exists('setting_logo_url')) {
     function setting_logo_url(): ?string
     {
         $path = setting('logo_path');
-        if ($path && file_exists(FCPATH . $path)) {
-            return base_url($path);
+        if (! $path) {
+            return null;
         }
+
+        $candidates = [$path];
+        if (str_starts_with($path, 'public/')) {
+            $candidates[] = substr($path, 7);
+        } else {
+            $candidates[] = 'public/' . $path;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (file_exists(FCPATH . $candidate)) {
+                if (str_starts_with($candidate, 'public/')) {
+                    $candidate = substr($candidate, 7);
+                }
+                return base_url($candidate);
+            }
+        }
+
         return null;
     }
 }

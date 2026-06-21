@@ -90,7 +90,7 @@
                         </tr>
                         <tr>
                             <td class="text-muted">Monthly Salary</td>
-                            <td class="fw-semibold">: ₱ <?= number_format(round($detail['monthly_salary']), 2) ?></td>
+                            <td class="fw-semibold">: ₱ <?= number_format(round($detail['employee_salary']), 2) ?></td>
                         </tr>
                     </table>
                 </div>
@@ -104,10 +104,10 @@
                 <?php
                     $cols = [
                         ['Working Days', $detail['working_days'], 'bg-secondary'],
-                        ['Days Worked', $detail['days_worked'], 'bg-primary'],
+                        ['Days Worked', (float)$detail['days_worked'], 'bg-primary'],
                         ['Whole Days', $detail['whole_days'], '#22c55e'],
                         ['Half Days', $detail['half_days'], '#f59e0b'],
-                        ['Absent', $detail['absent_days'], '#ef4444'],
+                        ['Absent (Whole Days)', (float)($detail['absent_days'] ?? 0), '#ef4444'],
                         ['OT Hours', $detail['overtime_hours'] . ' hrs', '#7c3aed'],
                     ];
                 ?>
@@ -151,19 +151,54 @@
                 <h6 class="fw-bold text-uppercase small text-muted mb-3">Deductions</h6>
 
                 <?php
-                    // Absent deduction
-                    $absentDed = (float)($detail['absent_deduction'] ?? 0);
-                    // For legacy records, compute dynamically if absent_deduction not stored
-                    if ($absentDed == 0 && (float)$detail['absent_days'] > 0 && (int)$detail['working_days'] > 0) {
-                        $absentDed = round(((float)$detail['monthly_salary'] / 2) / (int)$detail['working_days'] * (float)$detail['absent_days']);
+                    // Absent/half-day deduction
+                    $absentDed  = (float)($detail['absent_deduction'] ?? 0);
+                    $absentDays = (float)($detail['absent_days'] ?? 0);
+                    $halfDays   = (float)($detail['half_days'] ?? 0);
+                    // For legacy records, compute dynamically if absent_deduction not stored.
+                    // Use daily_rate (= monthly_salary / dept_working_days) as the per-day basis.
+                    // Half-days are intentionally excluded here because legacy records cannot
+                    // distinguish Sunday half-days (paid) from weekday half-days (deducted).
+                    if ($absentDed == 0 && $absentDays > 0) {
+                        $dailySal  = (float)$detail['daily_rate'];
+                        $absentDed = round($dailySal * $absentDays, 2);
                     }
+                    // Split empDeds into pharmacy and other based on paid deduction history
+                    $pharmacyDeds = array_filter($empDeds ?? [], fn($e) => ($e['type'] ?? '') === 'Pharmacy');
+                    $otherEmpDeds = array_filter($empDeds ?? [], fn($e) => ($e['type'] ?? '') !== 'Pharmacy');
+                    $pharmacyTotal = array_sum(array_column($pharmacyDeds, 'amount_deducted'));
                 ?>
 
-                <?php if ($absentDed > 0): ?>
+                <?php if ($absentDays > 0): ?>
                 <div class="payslip-row">
-                    <span>Absent (<?= (int)$detail['absent_days'] ?> day<?= (int)$detail['absent_days'] > 1 ? 's' : '' ?>)</span>
-                    <span class="text-danger">₱ <?= number_format(round($absentDed), 2) ?></span>
+                    <span>Absent (<?= number_format($absentDays, 0) ?> day<?= $absentDays != 1 ? 's' : '' ?>)</span>
+                    <?php if ($halfDays == 0): ?><span class="text-danger">₱ <?= number_format($absentDed, 2) ?></span><?php endif; ?>
                 </div>
+                <?php endif; ?>
+                <?php if ($halfDays > 0): ?>
+                <div class="payslip-row">
+                    <span>Half Day (<?= number_format($halfDays, 0) ?>)</span>
+                    <?php if ($absentDays == 0): ?><span class="text-danger">₱ <?= number_format($absentDed, 2) ?></span><?php endif; ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($absentDays > 0 && $halfDays > 0): ?>
+                <div class="payslip-row">
+                    <span class="text-muted small">Total attendance deduction</span>
+                    <span class="text-danger">₱ <?= number_format($absentDed, 2) ?></span>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($pharmacyTotal > 0): ?>
+                    <?php foreach ($pharmacyDeds as $ed): ?>
+                <div class="payslip-row">
+                    <span><?= esc($ed['description'] ?: $ed['type']) ?></span>
+                    <span class="text-danger">₱ <?= number_format(round($ed['amount_deducted']), 2) ?></span>
+                </div>
+                    <?php endforeach; ?>
+                    <div class="payslip-row text-muted small">
+                        <span>Pharmacy total</span>
+                        <span>₱ <?= number_format(round($pharmacyTotal), 2) ?></span>
+                    </div>
                 <?php endif; ?>
 
                 <?php if ($detail['sss_deduction'] > 0): ?>
@@ -187,15 +222,15 @@
                 </div>
                 <?php endif; ?>
 
-                <?php if ($detail['other_deductions'] > 0): ?>
-                <?php if (! empty($empDeds)):
-                    foreach ($empDeds as $ed): ?>
+                <?php if (! empty($otherEmpDeds) || $detail['other_deductions'] > 0): ?>
+                <?php if (! empty($otherEmpDeds)):
+                    foreach ($otherEmpDeds as $ed): ?>
                 <div class="payslip-row">
-                    <span><?= esc($ed['description']) ?></span>
-                    <span class="text-danger">₱ <?= number_format(round($ed['amount_per_cutoff']), 2) ?></span>
+                    <span><?= esc($ed['description'] ?? $ed['type'] ?? 'Other Deduction') ?></span>
+                    <span class="text-danger">₱ <?= number_format(round($ed['amount_deducted']), 2) ?></span>
                 </div>
                 <?php endforeach;
-                else: ?>
+                elseif ($detail['other_deductions'] > 0): ?>
                 <div class="payslip-row">
                     <span>Other Deductions</span>
                     <span class="text-danger">₱ <?= number_format(round($detail['other_deductions']), 2) ?></span>

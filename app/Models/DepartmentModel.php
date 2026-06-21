@@ -33,7 +33,7 @@ class DepartmentModel extends Model
         $rows = $this->select('name, working_days')->findAll();
         $map  = [];
         foreach ($rows as $row) {
-            $map[$row['name']] = (int) ($row['working_days'] ?: 26);
+            $map[$row['name']] = (float) ($row['working_days'] ?: 26.00);
         }
         return $map;
     }

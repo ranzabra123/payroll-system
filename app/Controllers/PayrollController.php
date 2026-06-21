@@ -64,16 +64,44 @@ class PayrollController extends Controller
             $month = date('Y-m');
         }
 
+        // Get 1st cutoff record for the month
         $firstCutoff = $this->model
             ->where('payroll_month', $month)
             ->where('cutoff', 1)
-            ->where('status', 'finalized')
             ->first();
+
+        $firstCutoffFinalized = false;
+        if ($firstCutoff && isset($firstCutoff['status']) && $firstCutoff['status'] === 'finalized') {
+            $firstCutoffFinalized = true;
+        }
+
+        // Get today's date and current month
+        $today = date('Y-m-d');
+        $currentYearMonth = date('Y-m');
+        $currentDay = (int)date('d');
+
+        // Compute period for 1st and 2nd cutoff
+        $period1 = \App\Models\PayrollModel::computePeriod($month, 1);
+        $period2 = \App\Models\PayrollModel::computePeriod($month, 2);
+
+        // Remove cutoff period restrictions: allow user to generate payroll 1 month before and after current month
+        $disableFirst = false;
+        $disableSecond = false;
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'firstCutoffFinalized' => $firstCutoffFinalized,
+                'disableFirst'         => $disableFirst,
+                'disableSecond'        => $disableSecond,
+            ]);
+        }
 
         return view('payroll/create', [
             'title'               => 'Generate Payroll',
             'selectedMonth'       => $month,
-            'firstCutoffFinalized' => (bool) $firstCutoff,
+            'firstCutoffFinalized' => $firstCutoffFinalized,
+            'disableFirst'         => $disableFirst,
+            'disableSecond'        => $disableSecond,
         ]);
     }
 
@@ -137,9 +165,15 @@ class PayrollController extends Controller
         foreach ($employees as $emp) {
             $attendance = $attModel->summarize($emp['id'], $period['start'], $period['end']);
 
-            // Dept-specific working days per cutoff (fallback: Mon-Fri count for period)
-            $deptWd         = $deptWdMap[$emp['department']] ?? null;
-            $empWorkingDays = $deptWd ? (int) ceil($deptWd / 2) : $period['working_days'];
+            // Calendar-based cutoff working days (for display / days_worked tracking).
+            // 28 or 30-day month: both cutoffs = 15 days.
+            // 31-day month: 1st cutoff = 15 days, 2nd cutoff = 16 days.
+            $calendarDays      = (int) date('t', strtotime($month . '-01'));
+            $empWorkingDays    = ($calendarDays === 31 && $cutoff === 2) ? 16.0 : 15.0;
+
+            // Dept working days used ONLY as the divisor for the daily rate deduction.
+            // Falls back to 26 if the employee's department is not mapped.
+            $deptWd = (float) ($deptWdMap[$emp['department']] ?? 26);
 
             // Special day adjustments for this employee
             $empSpecialDays    = $specialDaysByEmp[$emp['id']] ?? [];
@@ -165,15 +199,21 @@ class PayrollController extends Controller
             }
 
             // Employee-specific deductions (Cash Advance, loans, etc.)
-            $empDeductions   = $empDeductionModel->getActiveForCutoff($emp['id'], $cutoff, $period['end']);
-            $otherDeductions = 0.0;
+            $empDeductions      = $empDeductionModel->getActiveForCutoff($emp['id'], $cutoff, $period['end']);
+            $otherDeductions    = 0.0;
+            $pharmacyDeductions = 0.0;
             foreach ($empDeductions as $ed) {
-                $otherDeductions += (float) $ed['amount_per_cutoff'];
+                $applied = $this->getPayrollDeductionAmount($ed);
+                if (($ed['type'] ?? '') === 'Pharmacy') {
+                    $pharmacyDeductions += $applied;
+                } else {
+                    $otherDeductions += $applied;
+                }
             }
 
             $computed = PayrollDetailModel::compute(
-                $emp, $attendance, $empWorkingDays,
-                $specialAdjustment, $sssAmt, $phAmt, $piAmt, $otherDeductions
+                $emp, $attendance, $empWorkingDays, $deptWd,
+                $specialAdjustment, $sssAmt, $phAmt, $piAmt, $otherDeductions, $pharmacyDeductions
             );
 
             $computed['payroll_id']  = $payrollId;
@@ -184,7 +224,7 @@ class PayrollController extends Controller
             // Reduce remaining_balance on applied employee deductions
             $histModel = new DeductionHistoryModel();
             foreach ($empDeductions as $ed) {
-                $applied    = (float) $ed['amount_per_cutoff'];
+                $applied    = $this->getPayrollDeductionAmount($ed);
                 $balBefore  = (float) $ed['remaining_balance'];
                 $newBalance = max(0.0, $balBefore - $applied);
                 $updateData = ['remaining_balance' => $newBalance];
@@ -283,6 +323,7 @@ class PayrollController extends Controller
                 'id'                   => (int) $d['id'],
                 'gross_pay'            => (float) $d['gross_pay'],
                 'absent_deduction'     => $absentDed,
+                'pharmacy_deduction'   => (float) $d['pharmacy_deduction'],
                 'sss_deduction'        => (float) $d['sss_deduction'],
                 'philhealth_deduction' => (float) $d['philhealth_deduction'],
                 'pagibig_deduction'    => (float) $d['pagibig_deduction'],
@@ -363,7 +404,100 @@ class PayrollController extends Controller
         return redirect()->to(site_url('payroll'))->with('success', 'Payroll deleted.');
     }
 
-    /** Recalculate a draft payroll (in case attendance was updated). */
+    /** Deduction breakdown report for printing. */
+    public function deductionReport(int $id)
+    {
+        $payroll = $this->model->find($id);
+        if (! $payroll) {
+            return redirect()->to(site_url('payroll'))->with('error', 'Payroll not found.');
+        }
+
+        $details    = $this->detailModel->getByPayroll($id);
+        $cutoffVal  = (int)$payroll['cutoff'] === 1 ? '15' : '30';
+        $edModel    = new \App\Models\EmployeeDeductionModel();
+
+        $deductionRows = [];
+
+        foreach ($details as $d) {
+            $empName = $d['full_name'];
+
+            // Pharmacy (from payroll_details aggregate)
+            $pharmDed = (float)($d['pharmacy_deduction'] ?? 0);
+            if ($pharmDed > 0) {
+                $deductionRows[] = ['employee' => $empName, 'type' => 'Pharmacy', 'amount' => $pharmDed];
+            }
+
+            // Government contributions (cutoff 2 only)
+            if ((int)$payroll['cutoff'] === 2) {
+                if ((float)$d['sss_deduction'] > 0) {
+                    $deductionRows[] = ['employee' => $empName, 'type' => 'SSS', 'amount' => (float)$d['sss_deduction']];
+                }
+                if ((float)$d['philhealth_deduction'] > 0) {
+                    $deductionRows[] = ['employee' => $empName, 'type' => 'PhilHealth', 'amount' => (float)$d['philhealth_deduction']];
+                }
+                if ((float)$d['pagibig_deduction'] > 0) {
+                    $deductionRows[] = ['employee' => $empName, 'type' => 'Pag-IBIG', 'amount' => (float)$d['pagibig_deduction']];
+                }
+            }
+        }
+
+        // Cash Advance & Debt — fetch individual items from employee_deductions
+        $empIds = array_column($details, 'employee_id');
+        if (! empty($empIds)) {
+            $individualDeds = $edModel
+                ->select('employee_deductions.type, employee_deductions.amount_per_cutoff, employee_deductions.remaining_balance, employees.full_name')
+                ->join('employees', 'employees.id = employee_deductions.employee_id')
+                ->whereIn('employee_deductions.employee_id', $empIds)
+                ->whereIn('employee_deductions.type', ['Cash Advance', 'Debt'])
+                ->groupStart()
+                    ->where('employee_deductions.cutoff', $cutoffVal)
+                    ->orWhere('employee_deductions.cutoff', 'both')
+                    ->orWhere('employee_deductions.cutoff', 'full')
+                ->groupEnd()
+                ->where('employee_deductions.start_date <=', $payroll['period_end'])
+                ->where('employee_deductions.status', 'active')
+                ->where('employee_deductions.is_enabled', 1)
+                ->orderBy('employees.full_name', 'ASC')
+                ->findAll();
+
+            foreach ($individualDeds as $ed) {
+                $amt = min((float)$ed['amount_per_cutoff'], (float)$ed['remaining_balance']);
+                if ($amt > 0) {
+                    $deductionRows[] = ['employee' => $ed['full_name'], 'type' => $ed['type'], 'amount' => $amt];
+                }
+            }
+        }
+
+        // Group by deduction type
+        $grouped = [];
+        foreach ($deductionRows as $row) {
+            $grouped[$row['type']][] = $row;
+        }
+
+        // Sort each group by employee name
+        foreach ($grouped as &$rows) {
+            usort($rows, fn($a, $b) => strcmp($a['employee'], $b['employee']));
+        }
+        unset($rows);
+
+        // Enforce display order
+        $typeOrder = ['Pharmacy', 'Cash Advance', 'Debt', 'SSS', 'PhilHealth', 'Pag-IBIG'];
+        uksort($grouped, function ($a, $b) use ($typeOrder) {
+            $ai = array_search($a, $typeOrder);
+            $bi = array_search($b, $typeOrder);
+            $ai = $ai === false ? 99 : $ai;
+            $bi = $bi === false ? 99 : $bi;
+            return $ai - $bi;
+        });
+
+        return view('payroll/deduction_report', [
+            'payroll' => $payroll,
+            'label'   => \App\Models\PayrollModel::periodLabel($payroll),
+            'grouped' => $grouped,
+        ]);
+    }
+
+
     public function recalculate(int $id)
     {
         $payroll = $this->model->find($id);
@@ -388,8 +522,9 @@ class PayrollController extends Controller
                 $payroll['period_end']
             );
 
-            $deptWd         = $deptWdMap[$employee['department']] ?? null;
-            $empWorkingDays = $deptWd ? (int) ceil($deptWd / 2) : $payroll['working_days'];
+            $calendarDays      = (int) date('t', strtotime($payroll['payroll_month'] . '-01'));
+            $empWorkingDays    = ($calendarDays === 31 && $cutoff === 2) ? 16.0 : 15.0;
+            $deptWd            = (float) ($deptWdMap[$employee['department']] ?? 26);
             $prevSpecial    = (float) ($detail['special_adjustments'] ?? 0);
 
             // Government contributions from employee record (cutoff 2 only)
@@ -424,15 +559,21 @@ class PayrollController extends Controller
                 }
             }
 
-            $empDeductions   = $empDeductionModel->getActiveForCutoff($employee['id'], $cutoff, $payroll['period_end']);
-            $otherDeductions = 0.0;
+            $empDeductions      = $empDeductionModel->getActiveForCutoff($employee['id'], $cutoff, $payroll['period_end']);
+            $otherDeductions    = 0.0;
+            $pharmacyDeductions = 0.0;
             foreach ($empDeductions as $ed) {
-                $otherDeductions += (float) $ed['amount_per_cutoff'];
+                $applied = $this->getPayrollDeductionAmount($ed);
+                if (($ed['type'] ?? '') === 'Pharmacy') {
+                    $pharmacyDeductions += $applied;
+                } else {
+                    $otherDeductions += $applied;
+                }
             }
 
             $computed = PayrollDetailModel::compute(
-                $employee, $attendance, $empWorkingDays,
-                $prevSpecial, $sssAmt, $phAmt, $piAmt, $otherDeductions
+                $employee, $attendance, $empWorkingDays, $deptWd,
+                $prevSpecial, $sssAmt, $phAmt, $piAmt, $otherDeductions, $pharmacyDeductions
             );
 
             $this->detailModel->update($detail['id'], $computed);
@@ -441,7 +582,7 @@ class PayrollController extends Controller
             foreach ($empDeductions as $ed) {
                 // Reload fresh balance after possible restore above
                 $fresh      = $empDeductionModel->find($ed['id']);
-                $applied    = (float) $ed['amount_per_cutoff'];
+                $applied    = $this->getPayrollDeductionAmount($fresh);
                 $balBefore  = (float) $fresh['remaining_balance'];
                 $newBalance = max(0.0, $balBefore - $applied);
                 $upd        = ['remaining_balance' => $newBalance];
@@ -476,5 +617,17 @@ class PayrollController extends Controller
 
         return redirect()->to(site_url('payroll/view/' . $id))
                          ->with('success', 'Payroll recalculated.');
+    }
+
+    /**
+     * Get the deduction amount that should be applied for a payroll cutoff.
+     * Uses remaining balance if it is smaller than the per-cutoff amount.
+     */
+    private function getPayrollDeductionAmount(array $deduction): float
+    {
+        $amountPerCutoff = (float) ($deduction['amount_per_cutoff'] ?? 0);
+        $remainingBalance = (float) ($deduction['remaining_balance'] ?? 0);
+
+        return min($amountPerCutoff, max(0.0, $remainingBalance));
     }
 }

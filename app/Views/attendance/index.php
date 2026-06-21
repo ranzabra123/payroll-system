@@ -12,14 +12,45 @@
 <div class="card mb-3 p-2">
     <form method="get" class="d-flex gap-2 align-items-center">
         <label class="form-label mb-0 fw-medium">Date:</label>
-        <input type="date" name="date" class="form-control form-control-sm" style="width:200px;"
-               value="<?= esc($date) ?>" max="<?= date('Y-m-d') ?>" onchange="this.form.submit()"/>
+         <input type="date" name="date" class="form-control form-control-sm" style="width:200px;"
+             value="<?= esc($date) ?>" onchange="this.form.submit()"/>
         
         <span class="text-muted small ms-2">
             <i class="fa fa-circle-info me-1"></i>
             <?= date('l, F j, Y', strtotime($date)) ?>
         </span>
     </form>
+</div>
+
+<?php if (date('N', strtotime($date)) === '7'): ?>
+<div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-2" id="sundayNotice">
+    <i class="fa fa-sun text-warning"></i>
+    <span><strong>Sunday</strong> — All employees have been pre-set to <strong>Half Day (AM)</strong>. Adjust individually if needed.</span>
+</div>
+<?php endif; ?>
+
+<!-- Branch and search filter form (separate from attendance save form) -->
+<div class="d-flex gap-2 ms-auto align-items-center mb-2">
+    <form method="get" id="branchSortForm" class="d-flex align-items-center gap-2 mb-0" style="margin-bottom:0 !important;">
+        <select name="branch_id" class="form-select form-select-sm" style="width:160px;" onchange="document.getElementById('branchSortForm').submit()">
+            <option value="">All Branches</option>
+            <?php if (isset($branches)) foreach ($branches as $b): ?>
+                <option value="<?= $b['id'] ?>" <?= (isset($branchId) && $branchId == $b['id']) ? 'selected' : '' ?>><?= esc($b['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <input type="hidden" name="date" value="<?= esc($date) ?>"/>
+    </form>
+    <div class="input-group input-group-sm" style="width:260px;">
+        <span class="input-group-text bg-white border-end-0">
+            <i class="fa fa-magnifying-glass text-muted"></i>
+        </span>
+        <input type="text" id="attSearch" class="form-control border-start-0 ps-0"
+               placeholder="Search employee, position, or branch…"
+               oninput="filterAttendance(this.value)"/>
+        <button type="button" class="btn btn-outline-secondary"
+                onclick="document.getElementById('attSearch').value=''; filterAttendance('');"
+                title="Clear">✕</button>
+    </div>
 </div>
 
 <?php if (empty($employees)): ?>
@@ -29,7 +60,7 @@
 </div>
 <?php else: ?>
 
-<form action="<?= site_url('attendance/store') ?>" method="POST">
+<form action="<?= site_url('attendance/store') ?>" method="POST" id="attendanceSaveForm">
     <?= csrf_field() ?>
     <input type="hidden" name="attendance_date" value="<?= esc($date) ?>"/>
 
@@ -39,17 +70,6 @@
                 Attendance for <?= date('F j, Y', strtotime($date)) ?>
             </span>
             <div class="d-flex gap-2 ms-auto">
-                <div class="input-group input-group-sm" style="width:260px;">
-                    <span class="input-group-text bg-white border-end-0">
-                        <i class="fa fa-magnifying-glass text-muted"></i>
-                    </span>
-                    <input type="text" id="attSearch" class="form-control border-start-0 ps-0"
-                           placeholder="Search employee or position…"
-                           oninput="filterAttendance(this.value)"/>
-                    <button type="button" class="btn btn-outline-secondary"
-                            onclick="document.getElementById('attSearch').value=''; filterAttendance('');"
-                            title="Clear">✕</button>
-                </div>
                 <button type="button" class="btn btn-sm btn-outline-success" onclick="markAll('whole_day')">
                     All Whole Day
                 </button>
@@ -76,10 +96,10 @@
                             <th style="width:30px;">#</th>
                             <th>Employee</th>
                             <th>Position</th>
+                            <th>Branch</th>
                             <th style="width:200px;">
                                 <div class="d-flex gap-2 align-items-center">
-                                    Attendance Type
-                                    <span class="text-muted small fw-normal">(required)</span>
+                                    Attendance
                                 </div>
                             </th>
                             <th style="width:130px;">OT Hours</th>
@@ -89,13 +109,14 @@
                     <tbody id="attendanceTbody">
                     <?php foreach ($employees as $i => $emp): ?>
                         <?php $existing = $existingMap[$emp['id']] ?? null; ?>
-                        <tr data-search="<?= strtolower(esc($emp['full_name']) . ' ' . esc($emp['employee_code']) . ' ' . esc($emp['position'])) ?>">
+                        <tr data-search="<?= strtolower(esc($emp['full_name']) . ' ' . esc($emp['employee_code']) . ' ' . esc($emp['position']) . ' ' . (isset($emp['branch_name']) ? esc($emp['branch_name']) : '')) ?>">
                             <td class="text-muted small"><?= $i + 1 ?></td>
                             <td>
                                 <div class="fw-semibold"><?= esc($emp['full_name']) ?></div>
                                 <div class="text-muted small"><?= esc($emp['employee_code']) ?></div>
                             </td>
                             <td class="text-muted small"><?= esc($emp['position']) ?></td>
+                            <td class="text-muted small"><?= isset($emp['branch_name']) ? esc($emp['branch_name']) : '' ?></td>
                             <td>
                                 <select name="attendance[<?= $emp['id'] ?>]"
                                         class="form-select form-select-sm att-select">
@@ -187,5 +208,37 @@ document.getElementById('deleteAllBtn')?.addEventListener('click', function () {
         document.getElementById('deleteByDateForm').submit();
     }
 });
+
+// Auto-set half_am for employees with NO existing record when the date is a Sunday.
+// Never override rows that are already recorded (badge = Recorded).
+(function () {
+    const dateVal = '<?= esc($date) ?>';
+    if (!dateVal) return;
+    const d = new Date(dateVal + 'T00:00:00');
+    if (d.getDay() !== 0) return; // 0 = Sunday
+
+    document.querySelectorAll('#attendanceTbody tr').forEach(function (row) {
+        const sel    = row.querySelector('.att-select');
+        const badge  = row.querySelector('.badge');
+        const isNew  = badge && badge.classList.contains('bg-danger'); // "No Record"
+        // Only default to half_am when there is no saved record yet
+        if (sel && isNew) {
+            sel.value = 'half_am';
+        }
+    });
+
+    // Warn when user manually selects "absent" on a Sunday
+    document.querySelectorAll('.att-select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            if (this.value === 'absent') {
+                const row   = this.closest('tr');
+                const name  = row ? (row.querySelector('td:nth-child(2) .fw-semibold') || {}).textContent : '';
+                if (!confirm('Sunday: Mark ' + (name ? name.trim() : 'this employee') + ' as Absent on a Sunday?\n\nSundays are normally half-day. Press OK to confirm Absent.')) {
+                    this.value = 'half_am';
+                }
+            }
+        });
+    });
+})();
 </script>
 <?= $this->endSection() ?>

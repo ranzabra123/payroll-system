@@ -59,6 +59,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('payroll/finalize/(:num)',     'PayrollController::finalize/$1');
     $routes->get('payroll/recalculate/(:num)',  'PayrollController::recalculate/$1');
     $routes->get('payroll/delete/(:num)',       'PayrollController::delete/$1');
+    $routes->get('payroll/deduction-report/(:num)', 'PayrollController::deductionReport/$1');
 
     // ---- Payslip ----
     $routes->get('payslip/view/(:num)',    'PayslipController::view/$1');

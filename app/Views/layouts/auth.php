@@ -8,7 +8,7 @@
     <title><?= esc($title ?? 'Login') ?> – <?= esc($_companyName) ?></title>
     <?php if ($_logoUrl): ?><link rel="icon" type="image/png" href="<?= esc($_logoUrl) ?>"><?php endif; ?>
     <link rel="stylesheet" href="<?= base_url('assets/css/bootstrap.min.css') ?>"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="<?= base_url('assets/css/all.min.css') ?>"/>
     <link rel="stylesheet" href="<?= base_url('assets/css/custom.css') ?>"/>
     <style>
         .flash-container {

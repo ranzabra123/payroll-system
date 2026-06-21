@@ -79,17 +79,24 @@ class EmployeesController extends Controller
             return redirect()->back()->with('errors', $this->validator->getErrors())->withInput();
         }
 
-        $monthly = (float) $this->request->getPost('monthly_salary');
+        $monthly    = (float) $this->request->getPost('monthly_salary');
+        $department = $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS);
         $userBranch = user_branch_id();
-        $branchId = $userBranch ?? ((int) $this->request->getPost('branch_id') ?: null);
+        $branchId   = $userBranch ?? ((int) $this->request->getPost('branch_id') ?: null);
+
+        // Compute daily rate from department working days; fall back to 22 if dept not found
+        $deptWdMap  = (new \App\Models\DepartmentModel())->getWorkingDaysMap();
+        $deptWd     = (float) ($deptWdMap[$department] ?? 22);
+        $dailyRate  = $deptWd > 0 ? round($monthly / $deptWd, 4) : round($monthly / 22, 4);
+
         $data = [
             'employee_code'     => $this->model->generateEmployeeCode(),
             'full_name'         => $this->request->getPost('full_name', FILTER_SANITIZE_SPECIAL_CHARS),
             'position'          => $this->request->getPost('position', FILTER_SANITIZE_SPECIAL_CHARS),
-            'department'        => $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS),
+            'department'        => $department,
             'branch_id'         => $branchId,
             'monthly_salary'    => $monthly,
-            'daily_rate'        => round($monthly / 22, 4),
+            'daily_rate'        => $dailyRate,
             'date_hired'        => $this->request->getPost('date_hired'),
             'gender'            => $this->request->getPost('gender') ?: null,
             'sss_number'        => $this->request->getPost('sss_number', FILTER_SANITIZE_SPECIAL_CHARS),
@@ -170,16 +177,23 @@ class EmployeesController extends Controller
             return redirect()->back()->with('errors', $this->validator->getErrors())->withInput();
         }
 
-        $monthly = (float) $this->request->getPost('monthly_salary');
+        $monthly    = (float) $this->request->getPost('monthly_salary');
+        $department = $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS);
         $userBranch = user_branch_id();
-        $branchId = $userBranch ?? ((int) $this->request->getPost('branch_id') ?: null);
+        $branchId   = $userBranch ?? ((int) $this->request->getPost('branch_id') ?: null);
+
+        // Compute daily rate from department working days; fall back to 22 if dept not found
+        $deptWdMap  = (new \App\Models\DepartmentModel())->getWorkingDaysMap();
+        $deptWd     = (float) ($deptWdMap[$department] ?? 22);
+        $dailyRate  = $deptWd > 0 ? round($monthly / $deptWd, 4) : round($monthly / 22, 4);
+
         $data = [
             'full_name'               => $this->request->getPost('full_name', FILTER_SANITIZE_SPECIAL_CHARS),
             'position'                => $this->request->getPost('position', FILTER_SANITIZE_SPECIAL_CHARS),
-            'department'              => $this->request->getPost('department', FILTER_SANITIZE_SPECIAL_CHARS),
+            'department'              => $department,
             'branch_id'               => $branchId,
             'monthly_salary'          => $monthly,
-            'daily_rate'              => round($monthly / 22, 4),
+            'daily_rate'              => $dailyRate,
             'date_hired'              => $this->request->getPost('date_hired'),
             'gender'                  => $this->request->getPost('gender') ?: null,
             'sss_number'              => $this->request->getPost('sss_number', FILTER_SANITIZE_SPECIAL_CHARS),

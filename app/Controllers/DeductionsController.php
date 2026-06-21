@@ -5,6 +5,7 @@ namespace App\Controllers;
 use CodeIgniter\Controller;
 use App\Models\EmployeeDeductionModel;
 use App\Models\DeductionHistoryModel;
+use App\Models\PayrollDetailModel;
 use App\Models\PayrollModel;
 use App\Models\EmployeeModel;
 use App\Models\AuditLogModel;
@@ -22,10 +23,15 @@ class DeductionsController extends Controller
 
     public function index()
     {
+        $status = $this->request->getGet('status');
+        if ($status === null) {
+            $status = 'active';
+        }
+
         $filters = [
             'search' => $this->request->getGet('q'),
             'type'   => $this->request->getGet('type'),
-            'status' => $this->request->getGet('status'),
+            'status' => $status,
             'cutoff' => $this->request->getGet('cutoff'),
         ];
 
@@ -49,10 +55,10 @@ class DeductionsController extends Controller
     {
         $rules = [
             'employee_id'      => 'required|is_natural_no_zero',
-            'type'             => 'required|in_list[Cash Advance,Debt]',
+            'type'             => 'required|in_list[Cash Advance,Debt,Pharmacy]',
             'total_amount'     => 'required|decimal|greater_than[0]',
             'amount_per_cutoff'=> 'required|decimal|greater_than[0]',
-            'cutoff'           => 'required|in_list[15,30,both]',
+            'cutoff'           => 'required|in_list[15,30,both,full]',
             'start_date'       => 'required|valid_date[Y-m-d]',
         ];
 
@@ -130,9 +136,9 @@ class DeductionsController extends Controller
         }
 
         $rules = [
-            'type'              => 'required|in_list[Cash Advance,Debt]',
+            'type'              => 'required|in_list[Cash Advance,Debt,Pharmacy]',
             'amount_per_cutoff' => 'required|decimal|greater_than[0]',
-            'cutoff'            => 'required|in_list[15,30,both]',
+            'cutoff'            => 'required|in_list[15,30,both,full]',
             'remaining_balance' => 'required|decimal|greater_than_equal_to[0]',
             'status'            => 'required|in_list[active,completed,cancelled]',
             'start_date'        => 'required|valid_date[Y-m-d]',
@@ -193,18 +199,27 @@ class DeductionsController extends Controller
 
         $newVal     = $deduction['is_enabled'] ? 0 : 1;
         $histModel  = new DeductionHistoryModel();
-        $payModel   = new PayrollModel();
 
         // Map deduction cutoff to payroll cutoff number
-        $cutoffMap = ['15' => 1, '30' => 2, 'both' => null];
+        $cutoffMap = ['15' => 1, '30' => 2, 'both' => null, 'full' => null];
         $dedCutoff = $cutoffMap[$deduction['cutoff']] ?? null;
 
-        // Look for an existing DRAFT payroll that matches this deduction's cutoff
-        $draftQuery = $payModel->where('status', 'draft');
+        // Look for an existing DRAFT payroll containing this employee for the matching cutoff.
+        $db = \Config\Database::connect();
+        $draftPayroll = $db->table('payroll p')
+            ->select('p.*')
+            ->join('payroll_details pd', 'pd.payroll_id = p.id')
+            ->where('p.status', 'draft')
+            ->where('pd.employee_id', $deduction['employee_id']);
+
         if ($dedCutoff !== null) {
-            $draftQuery->where('cutoff', $dedCutoff);
+            $draftPayroll->where('p.cutoff', $dedCutoff);
         }
-        $draftPayroll = $draftQuery->orderBy('created_at', 'DESC')->first();
+
+        $draftPayroll = $draftPayroll->orderBy('p.created_at', 'DESC')
+                                     ->limit(1)
+                                     ->get()
+                                     ->getRowArray();
 
         if ($draftPayroll) {
             $histEntry = $histModel
@@ -221,13 +236,14 @@ class DeductionsController extends Controller
                 ]);
                 $histModel->where('id', $histEntry['id'])->delete();
 
-                // Recalculate payroll totals for this payroll
+                // Remove the deduction from the current draft payroll detail row and recalc totals
+                $this->_adjustDraftPayrollDetail($draftPayroll['id'], $deduction['employee_id'], (float)$histEntry['amount_deducted'], $deduction['type'], false);
                 $this->_recalculatePayrollTotals($draftPayroll['id']);
 
             } elseif ($newVal === 1 && ! $histEntry) {
                 // Turning ON and payroll already generated but deduction not yet applied — apply now
-                $fresh   = $this->model->find($id);
-                $applied = (float) $fresh['amount_per_cutoff'];
+                $fresh      = $this->model->find($id);
+                $applied    = (float) $fresh['amount_per_cutoff'];
                 $balBefore  = (float) $fresh['remaining_balance'];
                 $newBalance = max(0.0, $balBefore - $applied);
                 $upd = ['remaining_balance' => $newBalance, 'is_enabled' => 1];
@@ -245,10 +261,10 @@ class DeductionsController extends Controller
                     'balance_before'        => $balBefore,
                     'balance_after'         => $newBalance,
                 ]);
+                $this->_adjustDraftPayrollDetail($draftPayroll['id'], $deduction['employee_id'], $applied, $deduction['type'], true);
                 $this->_recalculatePayrollTotals($draftPayroll['id']);
 
             } else {
-                // No matching history or already in desired state — just flip flag
                 $this->model->update($id, ['is_enabled' => $newVal]);
             }
         } else {
@@ -281,6 +297,30 @@ class DeductionsController extends Controller
             'total_gross'      => round((float)($row['g'] ?? 0)),
             'total_deductions' => round((float)($row['d'] ?? 0)),
             'total_net'        => round((float)($row['n'] ?? 0)),
+        ]);
+    }
+
+    private function _adjustDraftPayrollDetail(int $payrollId, int $employeeId, float $amount, string $type, bool $apply): void
+    {
+        $detailModel = new PayrollDetailModel();
+        $row = $detailModel->where('payroll_id', $payrollId)
+                           ->where('employee_id', $employeeId)
+                           ->first();
+        if (! $row) {
+            return;
+        }
+
+        $field = $type === 'Pharmacy' ? 'pharmacy_deduction' : 'other_deductions';
+        $current = (float) ($row[$field] ?? 0);
+        $currentTotal = (float) ($row['total_deductions'] ?? 0);
+        $updatedField = $apply ? $current + $amount : max(0.0, $current - $amount);
+        $updatedTotal = $apply ? $currentTotal + $amount : max(0.0, $currentTotal - $amount);
+        $updatedNet = (float) ($row['gross_pay'] ?? 0) - $updatedTotal;
+
+        $detailModel->update($row['id'], [
+            $field => round($updatedField, 2),
+            'total_deductions' => round($updatedTotal, 2),
+            'net_pay' => round($updatedNet, 2),
         ]);
     }
 

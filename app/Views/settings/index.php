@@ -151,10 +151,10 @@
                                           placeholder="Optional description…"></textarea>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-medium">Working Days / Month <span class="text-danger">*</span></label>
-                                <input type="number" name="working_days" class="form-control"
-                                       value="26" min="1" max="31" required/>
-                                <div class="form-text">Used for absent deduction calculation per cutoff.</div>
+                                    <label class="form-label fw-medium">Working Days / Month <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.01" name="working_days" class="form-control"
+                                        value="26.00" min="1" max="31" required/>
+                                    <div class="form-text">Used for absent deduction calculation per cutoff. Supports decimals.</div>
                             </div>
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="fa fa-plus me-1"></i>Add Department
@@ -199,7 +199,7 @@
                                     <td class="text-muted small"><?= esc($dept['description'] ?: '—') ?></td>
                                     <td class="text-center">
                                         <span class="badge" style="background:#dbeafe;color:#1e40af;">
-                                            <?= (int)($dept['working_days'] ?? 26) ?> days
+                                            <?= $dept['working_days'] ?? 26 ?> days
                                         </span>
                                     </td>
                                     <td class="text-center">
@@ -245,9 +245,9 @@
                                                        placeholder="Description (optional)"/>
                                             </div>
                                             <div style="width:90px;">
-                                                <input type="number" name="working_days" class="form-control form-control-sm"
-                                                       value="<?= (int)($dept['working_days'] ?? 26) ?>"
-                                                       min="1" max="31" title="Working days/month" required/>
+                                                      <input type="number" step="0.01" name="working_days" class="form-control form-control-sm"
+                                                          value="<?= $dept['working_days'] ?? 26 ?>"
+                                                          min="1" max="31" title="Working days/month" required/>
                                             </div>
                                             <button type="submit" class="btn btn-sm btn-success">
                                                 <i class="fa fa-check me-1"></i>Save

@@ -41,6 +41,7 @@
                     <select name="type" class="form-select" required>
                         <option value="Cash Advance" <?= old('type', $deduction['type']) === 'Cash Advance' ? 'selected' : '' ?>>Cash Advance (CA)</option>
                         <option value="Debt"         <?= old('type', $deduction['type']) === 'Debt' ? 'selected' : '' ?>>Debt / Loan</option>
+                        <option value="Pharmacy"     <?= old('type', $deduction['type']) === 'Pharmacy' ? 'selected' : '' ?>>Pharmacy</option>
                     </select>
                 </div>
 
@@ -57,18 +58,20 @@
                 <!-- Cutoff -->
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Deduct On <span class="text-danger">*</span></label>
-                    <select name="cutoff" class="form-select" required>
+                    <select id="cutoff" name="cutoff" class="form-select" required>
                         <option value="15"   <?= old('cutoff', $deduction['cutoff']) === '15'   ? 'selected' : '' ?>>Every 15th (1st Cutoff)</option>
                         <option value="30"   <?= old('cutoff', $deduction['cutoff']) === '30'   ? 'selected' : '' ?>>Every 30th (2nd Cutoff)</option>
                         <option value="both" <?= old('cutoff', $deduction['cutoff']) === 'both' ? 'selected' : '' ?>>Every Cutoff (15 &amp; 30)</option>
+                        <option value="full" <?= old('cutoff', $deduction['cutoff']) === 'full' ? 'selected' : '' ?>>Deduct in Full (Once)</option>
                     </select>
                 </div>
 
                 <!-- Amount per cutoff -->
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Deduction per Cutoff (₱) <span class="text-danger">*</span></label>
-                    <input type="number" name="amount_per_cutoff" class="form-control" step="0.01" min="0.01"
+                    <input type="number" id="amount_per_cutoff" name="amount_per_cutoff" class="form-control" step="0.01" min="0.01"
                            value="<?= esc(old('amount_per_cutoff', $deduction['amount_per_cutoff'])) ?>" required/>
+                    <div class="form-text" id="terms_preview">—</div>
                 </div>
 
                 <!-- Total (display only) -->
@@ -117,5 +120,48 @@
         </form>
     </div>
 </div>
+
+<script>
+(function () {
+    const perCut   = document.getElementById('amount_per_cutoff');
+    const preview  = document.getElementById('terms_preview');
+    const cutoff   = document.getElementById('cutoff');
+    const total    = <?= (float) $deduction['total_amount'] ?>;
+
+    function isFullDeduct() {
+        return cutoff.value === 'full';
+    }
+
+    function applyFullDeduct() {
+        if (isFullDeduct()) {
+            perCut.value    = total;
+            perCut.readOnly = true;
+            perCut.classList.add('bg-light');
+            preview.textContent = 'Deducted in full on next cutoff';
+        } else {
+            perCut.readOnly = false;
+            perCut.classList.remove('bg-light');
+            calc();
+        }
+    }
+
+    function calc() {
+        if (isFullDeduct()) return;
+        const remaining = <?= (float) $deduction['remaining_balance'] ?>;
+        const p = parseFloat(perCut.value) || 0;
+        if (remaining > 0 && p > 0) {
+            const terms = Math.ceil(remaining / p);
+            preview.textContent = `≈ ${terms} cutoff term${terms !== 1 ? 's' : ''} remaining`;
+        } else {
+            preview.textContent = '—';
+        }
+    }
+
+    perCut.addEventListener('input', calc);
+    cutoff.addEventListener('change', applyFullDeduct);
+
+    applyFullDeduct();
+})();
+</script>
 
 <?= $this->endSection() ?>

@@ -105,15 +105,25 @@ class SettingsController extends Controller
 
         // Remove old logo if it exists
         $oldPath = $this->settings->getValue('logo_path');
-        if ($oldPath && file_exists(FCPATH . $oldPath)) {
-            @unlink(FCPATH . $oldPath);
+        if ($oldPath) {
+            $oldFile = FCPATH . $oldPath;
+            if (! file_exists($oldFile) && file_exists(FCPATH . 'public/' . $oldPath)) {
+                $oldFile = FCPATH . 'public/' . $oldPath;
+            }
+            if (file_exists($oldFile)) {
+                @unlink($oldFile);
+            }
         }
 
-        // Move to public/assets/uploads/
-        $uploadDir  = FCPATH . 'assets/uploads/';
+        // Move to the public assets upload folder.
+        $uploadDir = FCPATH . 'assets/uploads/';
+        if (! is_dir($uploadDir) && is_dir(FCPATH . 'public/assets')) {
+            $uploadDir = FCPATH . 'public/assets/uploads/';
+        }
         if (! is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
+
         $newName = 'logo_' . time() . '.' . $file->getExtension();
         $file->move($uploadDir, $newName);
 
@@ -128,8 +138,14 @@ class SettingsController extends Controller
     public function removeLogo()
     {
         $oldPath = $this->settings->getValue('logo_path');
-        if ($oldPath && file_exists(FCPATH . $oldPath)) {
-            @unlink(FCPATH . $oldPath);
+        if ($oldPath) {
+            $oldFile = FCPATH . $oldPath;
+            if (! file_exists($oldFile) && file_exists(FCPATH . 'public/' . $oldPath)) {
+                $oldFile = FCPATH . 'public/' . $oldPath;
+            }
+            if (file_exists($oldFile)) {
+                @unlink($oldFile);
+            }
         }
         $this->settings->setValue('logo_path', null);
         $this->audit->logAction('Settings', 'remove_logo', null, null, null, 'Removed company logo');
@@ -170,7 +186,13 @@ class SettingsController extends Controller
                 ->with('error', "Department '{$name}' already exists.");
         }
 
-        $newId = $this->deptModel->insert(['name' => $name, 'description' => $desc, 'is_active' => 1, 'working_days' => max(1, (int) $this->request->getPost('working_days'))]);
+        $workingDays = $this->request->getPost('working_days');
+        $newId = $this->deptModel->insert([
+            'name' => $name,
+            'description' => $desc,
+            'is_active' => 1,
+            'working_days' => $workingDays
+        ]);
         $this->audit->logAction('Departments', 'create', $newId, null, ['name' => $name, 'description' => $desc], "Added department '{$name}'");
 
         return redirect()->to(site_url('settings') . '#departments')
@@ -199,15 +221,45 @@ class SettingsController extends Controller
                 ->with('error', "Another department named '{$name}' already exists.");
         }
 
-        $oldDept = $this->deptModel->find($id);
-        $this->deptModel->update($id, ['name' => $name, 'description' => $desc, 'working_days' => max(1, (int) $this->request->getPost('working_days'))]);
-        $this->audit->logAction('Departments', 'update', $id,
-            ['name' => $oldDept['name'] ?? ''],
-            ['name' => $name, 'description' => $desc],
-            "Updated department: '{$name}'");
+        $oldDept     = $this->deptModel->find($id);
+        $workingDays = (float) $this->request->getPost('working_days');
+        $this->deptModel->update($id, [
+            'name'         => $name,
+            'description'  => $desc,
+            'working_days' => $workingDays,
+        ]);
 
+        // Auto-update daily_rate for all active employees in this department
+        // when working days changes: daily_rate = monthly_salary / working_days
+        $oldWd = (float) ($oldDept['working_days'] ?? 0);
+        if ($workingDays > 0 && $oldWd !== $workingDays) {
+            $empModel  = new \App\Models\EmployeeModel();
+            $employees = $empModel->where('status', 'active')
+                                  ->where('department', $name)
+                                  ->findAll();
+            foreach ($employees as $emp) {
+                $monthlySalary = (float) $emp['monthly_salary'];
+                if ($monthlySalary > 0) {
+                    $newDailyRate = round($monthlySalary / $workingDays, 2);
+                    $empModel->update($emp['id'], ['daily_rate' => $newDailyRate]);
+                }
+            }
+            $updatedCount = count($employees);
+        } else {
+            $updatedCount = 0;
+        }
+
+        $this->audit->logAction('Departments', 'update', $id,
+            ['name' => $oldDept['name'] ?? '', 'working_days' => $oldWd],
+            ['name' => $name, 'description' => $desc, 'working_days' => $workingDays],
+            "Updated department: '{$name}'" . ($updatedCount ? " — recalculated daily rate for {$updatedCount} employee(s)" : ''));
+
+        $msg = "Department updated to '{$name}'.";
+        if ($updatedCount > 0) {
+            $msg .= " Daily rate recalculated for {$updatedCount} employee(s).";
+        }
         return redirect()->to(site_url('settings') . '#departments')
-            ->with('success', "Department updated to '{$name}'.");
+            ->with('success', $msg);
     }
 
     /** Toggle department active/inactive. */

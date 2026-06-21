@@ -41,20 +41,26 @@
                     foreach ($records as $r) { $byDate[$r['attendance_date']] = $r; }
                     $cur = strtotime($start);
                     $endTs = strtotime($end);
-                    $totalDays = 0; $totalOT = 0;
+                    $totalDays = 0; $totalOT = 0; $totalAbsent = 0; $totalHalf = 0;
                     while ($cur <= $endTs):
                         $ds  = date('Y-m-d', $cur);
                         $dow = (int)date('N', $cur);
                         $rec = $byDate[$ds] ?? null;
-                        $eq  = 0;
                         if ($rec) {
-                            $eq = match($rec['attendance_type']) {
-                                'whole_day' => 1.0,
-                                'half_am','half_pm' => 0.5,
-                                default => 0.0,
-                            };
-                            $totalDays += $eq;
-                            $totalOT   += (float)$rec['overtime_hours'];
+                            switch ($rec['attendance_type']) {
+                                case 'whole_day':
+                                    $totalDays += 1.0;
+                                    break;
+                                case 'half_am':
+                                case 'half_pm':
+                                    $totalDays += 0.5;
+                                    $totalHalf++;
+                                    break;
+                                case 'absent':
+                                    $totalAbsent++;
+                                    break;
+                            }
+                            $totalOT += (float)$rec['overtime_hours'];
                         }
                 ?>
                 <tr class="<?= $dow >= 6 ? 'table-light text-muted' : '' ?>">
@@ -83,9 +89,14 @@
                 </tbody>
                 <tfoot>
                     <tr class="table-dark fw-bold">
-                        <td colspan="3">Total</td>
-                        <td><?= $totalOT ?> hrs</td>
-                        <td><?= $totalDays ?> effective day(s)</td>
+                        <td colspan="3">Totals</td>
+                        <td><?= $totalOT > 0 ? $totalOT . ' hrs' : '—' ?></td>
+                        <td>
+                            Working Days: <strong><?= number_format($monthlyWd, $monthlyWd == floor($monthlyWd) ? 0 : 1) ?></strong>
+                            &nbsp;|&nbsp; Attended: <strong><?= number_format($totalDays, $totalDays == floor($totalDays) ? 0 : 1) ?></strong>
+                            &nbsp;|&nbsp; Absent: <strong><?= $totalAbsent ?></strong>
+                            &nbsp;|&nbsp; Half Day: <strong><?= $totalHalf ?></strong>
+                        </td>
                     </tr>
                 </tfoot>
             </table>

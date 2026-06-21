@@ -198,7 +198,7 @@
                 <tr>
                     <td><?= date('F Y', strtotime($row['period_start'])) ?></td>
                     <td><span class="badge bg-secondary"><?= $row['cutoff'] == 1 ? '1st' : '2nd' ?></span></td>
-                    <td class="text-center"><?= $row['days_worked'] ?>/<?= $row['working_days'] ?></td>
+                    <td class="text-center"><?= (float)$row['days_worked'] ?>/<?= $row['working_days'] ?></td>
                     <td class="text-end">₱ <?= number_format($row['basic_pay'], 2) ?></td>
                     <td class="text-end text-success">₱ <?= number_format($row['gross_pay'], 2) ?></td>
                     <td class="text-end text-danger">₱ <?= number_format($row['total_deductions'], 2) ?></td>

@@ -42,16 +42,18 @@
                     <select name="type" class="form-select" required>
                         <option value="Cash Advance" <?= old('type', 'Cash Advance') === 'Cash Advance' ? 'selected' : '' ?>>Cash Advance (CA)</option>
                         <option value="Debt"         <?= old('type') === 'Debt' ? 'selected' : '' ?>>Debt / Loan</option>
+                        <option value="Pharmacy"     <?= old('type') === 'Pharmacy' ? 'selected' : '' ?>>Pharmacy</option>
                     </select>
                 </div>
 
                 <!-- Cutoff -->
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Deduct On <span class="text-danger">*</span></label>
-                    <select name="cutoff" class="form-select" required>
+                    <select id="cutoff" name="cutoff" class="form-select" required>
                         <option value="15"   <?= old('cutoff', '15') === '15'   ? 'selected' : '' ?>>Every 15th (1st Cutoff)</option>
                         <option value="30"   <?= old('cutoff') === '30'   ? 'selected' : '' ?>>Every 30th (2nd Cutoff)</option>
                         <option value="both" <?= old('cutoff') === 'both' ? 'selected' : '' ?>>Every Cutoff (15 &amp; 30)</option>
+                        <option value="full" <?= old('cutoff') === 'full' ? 'selected' : '' ?>>Deduct in Full (Once)</option>
                     </select>
                 </div>
 
@@ -105,11 +107,31 @@
 
 <script>
 (function () {
-    const total  = document.getElementById('total_amount');
-    const perCut = document.getElementById('amount_per_cutoff');
+    const total   = document.getElementById('total_amount');
+    const perCut  = document.getElementById('amount_per_cutoff');
     const preview = document.getElementById('terms_preview');
+    const cutoff  = document.getElementById('cutoff');
+    const perCutWrap = perCut.closest('.col-md-6');
+
+    function isFullDeduct() {
+        return cutoff.value === 'full';
+    }
+
+    function applyFullDeduct() {
+        if (isFullDeduct()) {
+            perCut.value    = total.value || '';
+            perCut.readOnly = true;
+            perCut.classList.add('bg-light');
+            preview.textContent = 'Deducted in full on next cutoff';
+        } else {
+            perCut.readOnly = false;
+            perCut.classList.remove('bg-light');
+            calc();
+        }
+    }
 
     function calc() {
+        if (isFullDeduct()) return;
         const t = parseFloat(total.value) || 0;
         const p = parseFloat(perCut.value) || 0;
         if (t > 0 && p > 0) {
@@ -120,9 +142,14 @@
         }
     }
 
-    total.addEventListener('input', calc);
+    total.addEventListener('input', function () {
+        if (isFullDeduct()) perCut.value = this.value || '';
+        calc();
+    });
     perCut.addEventListener('input', calc);
-    calc();
+    cutoff.addEventListener('change', applyFullDeduct);
+
+    applyFullDeduct();
 })();
 </script>
 

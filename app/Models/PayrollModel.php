@@ -76,10 +76,13 @@ class PayrollModel extends Model
     /**
      * Compute period dates for a given month and cutoff.
      * Returns ['start' => 'Y-m-d', 'end' => 'Y-m-d', 'working_days' => n]
+     *
+     * Working days are calendar-based (not dept-specific):
+     *   28 or 30-day month: both cutoffs = 15 days
+     *   31-day month: 1st cutoff = 15 days, 2nd cutoff = 16 days
      */
     public static function computePeriod(string $yearMonth, int $cutoff): array
     {
-        [$year, $month] = explode('-', $yearMonth);
         if ($cutoff === 1) {
             $start = "{$yearMonth}-01";
             $end   = "{$yearMonth}-15";
@@ -87,17 +90,14 @@ class PayrollModel extends Model
             $start = "{$yearMonth}-16";
             $end   = date('Y-m-t', strtotime("{$yearMonth}-01")); // last day of month
         }
-        // Count Mon-Fri in range (exclude weekends) as working days
-        $workingDays = 0;
-        $current = strtotime($start);
-        $endTs   = strtotime($end);
-        while ($current <= $endTs) {
-            $dow = (int) date('N', $current); // 1=Mon…7=Sun
-            if ($dow <= 5) {
-                $workingDays++;
-            }
-            $current = strtotime('+1 day', $current);
+
+        $calendarDays = (int) date('t', strtotime("{$yearMonth}-01"));
+        if ($calendarDays === 31) {
+            $workingDays = ($cutoff === 1) ? 15 : 16;
+        } else {
+            $workingDays = 15; // 28 and 30-day months: both cutoffs = 15
         }
+
         return ['start' => $start, 'end' => $end, 'working_days' => $workingDays];
     }
 }

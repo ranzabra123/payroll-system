@@ -58,6 +58,7 @@
                         <th class="text-end">Per Cutoff</th>
                         <th class="text-center">Cutoff</th>
                         <th class="text-end">Remaining</th>
+                        <th>Date Completed</th>
                         <th>Progress</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -65,7 +66,7 @@
                 </thead>
                 <tbody>
                 <?php if (empty($deductions)): ?>
-                    <tr><td colspan="10" class="text-center text-muted py-4">No deduction records found.</td></tr>
+                    <tr><td colspan="11" class="text-center text-muted py-4">No deduction records found.</td></tr>
                 <?php else: ?>
                 <?php foreach ($deductions as $d):
                     $paid    = (float)$d['total_amount'] - (float)$d['remaining_balance'];
@@ -97,6 +98,13 @@
                     </td>
                     <td class="text-end fw-semibold <?= (float)$d['remaining_balance'] > 0 ? 'text-danger' : 'text-muted' ?>" data-col="remaining">
                         ₱ <?= number_format($d['remaining_balance'], 2) ?>
+                    </td>
+                    <td>
+                        <?php if ($d['status'] === 'completed' && ! empty($d['updated_at'])): ?>
+                        <?= date('M j, Y', strtotime($d['updated_at'])) ?>
+                        <?php else: ?>
+                        &mdash;
+                        <?php endif; ?>
                     </td>
                     <td style="min-width:100px" data-col="progress">
                         <div class="progress" style="height:8px;" title="<?= $pct ?>% paid">

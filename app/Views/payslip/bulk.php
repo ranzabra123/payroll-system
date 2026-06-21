@@ -10,132 +10,103 @@
     <link rel="stylesheet" href="<?= base_url('assets/css/bootstrap.min.css') ?>"/>
     <link rel="stylesheet" href="<?= base_url('assets/css/custom.css') ?>"/>
     <style>
-        @page {
-            size: A4 landscape;
-            margin: 0;
+        /* ── Variables ── */
+        :root { --primary: #2563eb; }
+
+        /* ── Page setup ── */
+        @page { size: A4 portrait; margin: 3mm 2mm; }
+
+        /* ── Payslip grid ── */
+        .payslip-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.6rem;
         }
-        
+
+        /* ── Single payslip card ── */
+        .payslip-wrapper {
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            overflow: hidden;
+            background: #fff;
+            font-family: Arial, sans-serif;
+            font-size: 8.5pt;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Blue header (matches UI) ── */
+        .ps-header {
+            background: #2563eb !important;
+            color: #fff !important;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.25rem 0.4rem;
+        }
+        .ps-header-left { display: flex; align-items: center; gap: 0.25rem; }
+        .ps-logo        { height: 20px; width: auto; object-fit: contain; flex-shrink: 0; }
+        .ps-company     { font-weight: 700; font-size: 9pt; }
+        .ps-header-right{ text-align: right; }
+        .ps-label       { font-weight: 700; font-size: 8pt; display: block; letter-spacing:.05em; }
+        .ps-period      { font-size: 7.5pt; opacity: .85; display: block; }
+
+        /* ── Info rows ── */
+        .ps-info        { border-bottom: 1px solid #e5e7eb; padding: 0.15rem 0.3rem; }
+        .ps-info-table  { width: 100%; border-collapse: collapse; }
+        .ps-info-table td { padding: 0.5px 2px; line-height: 1.3; font-size: 8pt; vertical-align: top; }
+        .ps-k           { color: #6b7280; width: 22%; white-space: nowrap; }
+        .ps-v           { width: 28%; }
+
+        /* ── Earnings / Deductions ── */
+        .ps-body        { display: flex; flex-direction: column; flex: 1; border-bottom: 1px solid #e5e7eb; }
+        .ps-col-left    { width: 100%; padding: 0.15rem 0.25rem; border-bottom: 1px solid #e5e7eb; }
+        .ps-col-right   { width: 100%; padding: 0.15rem 0.25rem; }
+        .ps-section-title { font-size: 7pt; font-weight: 700; text-transform: uppercase;
+                            letter-spacing: .05em; color: #6b7280; margin-bottom: 0.1rem; }
+        .ps-row         { display: flex; justify-content: space-between; font-size: 8pt;
+                          line-height: 1.35; }
+        .ps-row span:last-child { font-size: 10pt; }
+        .ps-total       { font-weight: 700; border-top: 0.5px solid #d1d5db;
+                          margin-top: 0.1rem; padding-top: 0.1rem; }
+
+        /* ── Net Pay footer ── */
+        .ps-net         { display: flex; align-items: center; justify-content: space-between;
+                          padding: 0.15rem 0.3rem; background: #f8fafc; }
+        .ps-net-label   { font-size: 10pt; color: #6b7280; font-weight: 600; text-transform: uppercase; }
+        .ps-net-value   { font-weight: 700; font-size: 14pt; color: var(--primary); }
+
+        /* ── Utilities ── */
+        .text-success { color: #16a34a; }
+        .text-danger  { color: #dc2626; font-size: 10pt; }
+        .fw-semibold  { font-weight: 600; }
+        .font-monospace { font-family: monospace; }
+
+        /* ── Screen only ── */
+        @media screen {
+            body { background: #f1f5f9; }
+            .container-fluid { padding: 1rem; }
+            .payslip-grid { gap: 1rem; }
+            .ps-header {
+                background: #2563eb !important;
+                color: #fff !important;
+            }
+        }
+
+        /* ── Print ── */
         @media print {
             .no-print { display: none !important; }
-            body { 
-                margin: 0; 
-                padding: 0.1in;
-                background: white;
-                height: auto;
-                width: 100%;
+            html, body, .container-fluid, .py-4 {
+                margin: 0 !important; padding: 0 !important;
+                max-width: 100% !important; background: white !important;
             }
-            
-            .payslip-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                grid-auto-rows: minmax(auto, 1fr);
-                gap: 0.08rem;
-                margin: 0;
-                padding: 0;
-                width: 100%;
-                height: auto;
-            }
-            
-            .payslip-grid.page-break-after {
-                page-break-after: always;
-            }
-            
+            .payslip-grid { gap: 0; }
             .payslip-wrapper {
-                margin: 0 !important;
-                padding: 0.15rem;
+                border-radius: 0;
+                border: 0.5px solid #bbb;
+                break-inside: avoid;
                 page-break-inside: avoid;
-                font-size: 0.52rem;
-                border: 0.5px solid #ccc;
-                background: white;
-                box-sizing: border-box;
-                width: 100%;
-                height: auto;
-                display: flex;
-                flex-direction: column;
             }
-            
-            .payslip-header { 
-                padding: 0.1rem 0; 
-                margin-bottom: 0.08rem;
-                border-bottom: 0.5px solid #ddd;
-            }
-            
-            .payslip-header h5 { 
-                font-size: 0.6rem; 
-                margin-bottom: 0 !important;
-                margin-top: 0 !important;
-            }
-            
-            .payslip-header small { 
-                font-size: 0.45rem; 
-                display: block;
-                margin-top: 0.02rem;
-            }
-            
-            .payslip-header .row { margin: 0; }
-            .payslip-header .col { padding: 0; }
-            
-            .payslip-row { 
-                display: flex; 
-                justify-content: space-between; 
-                margin-bottom: 0.04rem;
-                font-size: 0.48rem;
-            }
-            
-            table { 
-                margin-bottom: 0 !important;
-                width: 100%;
-            }
-            
-            table td { 
-                padding: 0.04rem !important; 
-                line-height: 0.95;
-                font-size: 0.48rem;
-            }
-            
-            h6 { 
-                font-size: 0.45rem !important; 
-                margin-bottom: 0.06rem !important;
-                font-weight: 700;
-            }
-            
-            .border-bottom, .border-end, .border-top { 
-                border-width: 0.5px !important; 
-            }
-            
-            .text-muted { color: #666; }
-        }
-        
-        @media screen {
-            .payslip-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                gap: 1rem;
-            }
-            .payslip-wrapper { margin-bottom: 0; }
-            /* Override custom.css large header on screen view */
-            .payslip-header {
-                padding: 0.6rem 1rem;
-            }
-        }
-
-        /* Logo wrapper — no background */
-        .logo-shadow-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .logo-shadow-wrapper img {
-            max-height: 36px;
-            max-width: 36px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
         }
     </style>
 </head>
@@ -145,7 +116,7 @@
 <?php $_logoUrl = setting_logo_url(); ?>
 <?php $_tagline = setting('company_tagline', 'Payroll Management System'); ?>
 
-<div class="container py-4">
+<div class="container-fluid py-4">
     <div class="d-flex align-items-center justify-content-between mb-3 no-print flex-wrap gap-2">
         <h5 class="mb-0"><?= esc($title) ?> (<?= count($details) ?> payslips)</h5>
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -163,94 +134,123 @@
         </div>
     </div>
 
-    <?php 
-    $totalSlips = count($details);
-    $pagesNeeded = ceil($totalSlips / 6);
-    
-    for ($page = 0; $page < $pagesNeeded; $page++):
-        $startIdx = $page * 6;
-        $endIdx = min($startIdx + 6, $totalSlips);
-        $pageDetails = array_slice($details, $startIdx, $endIdx - $startIdx);
-    ?>
-    <div class="payslip-grid <?= ($page < $pagesNeeded - 1) ? 'page-break-after' : '' ?>">
-        <?php foreach ($pageDetails as $d): ?>
+    <div class="payslip-grid">
+        <?php foreach ($details as $d): ?>
+        <?php
+            $dAbsent   = (float)($d['absent_deduction'] ?? 0);
+            $dAbsDays  = (float)($d['absent_days'] ?? 0);
+            $dHalfDays = (float)($d['half_days'] ?? 0);
+            // Legacy fallback: only use absent_days — half_days may include paid Sundays
+            // which cannot be distinguished without re-querying attendance.
+            if ($dAbsent == 0 && $dAbsDays > 0) {
+                $dDailySal = (float)$d['daily_rate'];
+                $dAbsent   = round($dDailySal * $dAbsDays, 2);
+            }
+            // Deductable half-days = derived from stored deduction minus whole-day absents
+            // absent_deduction = daily_rate × (absent_days + deductable_half_days × 0.5)
+            // deductable_half_days = ((absent_deduction / daily_rate) - absent_days) / 0.5
+            $dDeductUnits     = (float)$d['daily_rate'] > 0 && $dAbsent > 0
+                                ? round($dAbsent / (float)$d['daily_rate'], 4)
+                                : $dAbsDays;
+            $dDeductHalfDays  = max(0, round(($dDeductUnits - $dAbsDays) / 0.5));
+            // Days worked calculation: present + absent + deductable_half
+            // daysWorked stores: whole_days + (half_days * 0.5)
+            // whole_days = daysWorked - (half_days * 0.5)
+            $dWholeDays       = (float)$d['days_worked'] - ((float)$d['half_days'] * 0.5);
+            $dTotalDaysAcct   = $dWholeDays + $dAbsDays + ($dDeductHalfDays * 0.5);
+        ?>
         <div class="payslip-wrapper" data-name="<?= esc(strtolower($d['full_name'])) ?>" data-branch="<?= esc($d['branch_id'] ?? '') ?>">
-        <div class="payslip-header">
-            <div class="row align-items-center">
-                <div class="col">
-                    <div style="display: flex; align-items: center; gap: 0.3rem;">
-                        <?php if ($_logoUrl): ?>
-                        <div class="logo-shadow-wrapper">
-                            <img src="<?= esc($_logoUrl) ?>" alt="Logo">
-                        </div>
-                        <?php endif; ?>
-                        <div>
-                            <h19 class="mb-0 fw-bold lh-1" style="display:block;"><?= esc($_companyName) ?></h19>
-                        </div>
-                    </div>
-                </div>
-                <div class="col text-end"><div class="fw-bold small">PAYSLIP</div><small class="opacity-75" style="font-size:0.7rem;"><?= \App\Models\PayrollModel::periodLabel($payroll) ?></small></div>
-            </div>
-        </div>
-        <div style="padding: 0.15rem 0.3rem; border-bottom: 1px solid #dee2e6;">
-            <div class="row g-2">
-                <div class="col-md-6">
-                    <table class="table table-sm table-borderless mb-0" style="font-size:0.5rem;">
-                        <tr><td class="text-muted" style="width:60px;">Employee</td><td class="fw-semibold">: <?= esc($d['full_name']) ?></td></tr>
-                        <tr><td class="text-muted">ID</td><td class="font-monospace" style="font-size:0.48rem;">: <?= esc($d['employee_code']) ?></td></tr>
-                        <tr><td class="text-muted">Position</td><td style="font-size:0.5rem;">: <?= esc($d['position']) ?></td></tr>
-                    </table>
-                </div>
-                <div class="col-md-6">
-                    <table class="table table-sm table-borderless mb-0" style="font-size:0.5rem;">
-                        <tr><td class="text-muted" style="width:70px;">Period</td><td style="font-size:0.5rem;">: <?= date('M j', strtotime($payroll['period_start'])) ?>–<?= date('M j, Y', strtotime($payroll['period_end'])) ?></td></tr>
-                        <tr><td class="text-muted">Salary</td><td class="fw-semibold" style="font-size:0.5rem;">: ₱ <?= number_format(round($d['monthly_salary']), 2) ?></td></tr>
-                        <tr><td class="text-muted">Days</td><td style="font-size:0.5rem;">: <?= $d['days_worked'] ?></td></tr>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <div class="row g-0">
-            <div class="col-md-6" style="padding: 0.15rem 0.25rem; border-right: 1px solid #dee2e6;">
-                <h6 class="text-uppercase small text-muted mb-2" style="font-size:0.52rem;margin-bottom:0.08rem!important;">Earnings</h6>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Basic Pay</span><span>₱ <?= number_format(round($d['basic_pay']), 2) ?></span></div>
 
-                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>GROSS</span><span class="text-success">₱ <?= number_format(round($d['gross_pay']), 2) ?></span></div>
+            <!-- Blue header -->
+            <div class="ps-header">
+                <div class="ps-header-left">
+                    <?php if ($_logoUrl): ?><img src="<?= esc($_logoUrl) ?>" alt="Logo" class="ps-logo"><?php endif; ?>
+                    <span class="ps-company"><?= esc($_companyName) ?></span>
+                </div>
+                <div class="ps-header-right">
+                    <span class="ps-label">PAYSLIP</span>
+                    <span class="ps-period"><?= \App\Models\PayrollModel::periodLabel($payroll) ?></span>
+                </div>
             </div>
-            <div class="col-md-6" style="padding: 0.15rem 0.25rem;">
-                <h6 class="text-uppercase small text-muted mb-2" style="font-size:0.52rem;margin-bottom:0.08rem!important;">Deductions</h6>
-                <?php
-                    $dAbsent = (float)($d['absent_deduction'] ?? 0);
-                    if ($dAbsent == 0 && (float)$d['absent_days'] > 0 && (int)$d['working_days'] > 0) {
-                        $dAbsent = round(((float)$d['monthly_salary'] / 2) / (int)$d['working_days'] * (float)$d['absent_days']);
-                    }
-                ?>
-                <?php if ($dAbsent > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Absent</span><span class="text-danger">₱ <?= number_format(round($dAbsent), 2) ?></span></div><?php endif; ?>
-                <?php if (($d['sss_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>SSS</span><span class="text-danger">₱ <?= number_format(round($d['sss_deduction']), 2) ?></span></div><?php endif; ?>
-                <?php if (($d['philhealth_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>PhilHealth</span><span class="text-danger">₱ <?= number_format(round($d['philhealth_deduction']), 2) ?></span></div><?php endif; ?>
-                <?php if (($d['pagibig_deduction'] ?? 0) > 0): ?><div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Pag-IBIG</span><span class="text-danger">₱ <?= number_format(round($d['pagibig_deduction']), 2) ?></span></div><?php endif; ?>
-                <?php if (($d['other_deductions'] ?? 0) > 0): ?>
+
+            <!-- Employee + pay info: vertical list -->
+            <div class="ps-info">
+                <table class="ps-info-table">
+                    <tr>
+                        <td class="ps-k">Employee</td>
+                        <td class="ps-v fw-semibold"><?= esc($d['full_name']) ?></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-k">Position</td>
+                        <td class="ps-v"><?= esc($d['position']) ?></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-k">Period</td>
+                        <td class="ps-v"><?= date('M j', strtotime($payroll['period_start'])) ?>–<?= date('M j, Y', strtotime($payroll['period_end'])) ?></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-k">Salary</td>
+                        <td class="ps-v fw-semibold">₱ <?= number_format(round($d['employee_salary']), 2) ?></td>
+                    </tr>
+                  <!--  <tr>
+                        <td class="ps-k">Days Worked</td>
+                        <td class="ps-v"><strong><?= rtrim(rtrim(number_format($dTotalDaysAcct, 2), '0'), '.') ?></strong></td>
+                    </tr>-->
+                </table>
+            </div>
+
+            <!-- Earnings | Deductions -->
+            <div class="ps-body">
+                <div class="ps-col-left">
+                    <div class="ps-section-title">Earnings</div>
+                    <div class="ps-row"><span>Basic Pay</span><span>₱ <?= number_format(round($d['basic_pay']), 2) ?></span></div>
+                    <div class="ps-row ps-total"><span>GROSS</span><span class="text-success">₱ <?= number_format(round($d['gross_pay']), 2) ?></span></div>
+                </div>
+                <div class="ps-col-right">
+                    <div class="ps-section-title">Deductions</div>
                     <?php
-                    $empDeds = $empDedsMap[$d['employee_id']] ?? [];
-                    if ($empDeds):
-                        foreach ($empDeds as $ed): ?>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span><?= esc($ed['description']) ?></span><span class="text-danger">₱ <?= number_format(round($ed['amount_per_cutoff']), 2) ?></span></div>
-                        <?php endforeach;
-                    else: ?>
-                <div class="payslip-row" style="font-size:0.52rem;margin-bottom:0.05rem;"><span>Other Ded.</span><span class="text-danger">₱ <?= number_format(round($d['other_deductions']), 2) ?></span></div>
+                        $dTotalDeductUnits = $dAbsDays + ($dDeductHalfDays * 0.5);
+                    ?>
+                    <?php if ($dTotalDeductUnits > 0): ?>
+                        <div class="ps-row"><span class="text-danger">Absent: <?= rtrim(rtrim(number_format($dTotalDeductUnits, 2), '0'), '.') ?></span><span class="text-danger">₱ <?= number_format($dAbsent, 2) ?></span></div>
                     <?php endif; ?>
-                <?php endif; ?>
-                <div class="payslip-row payslip-total" style="font-size:0.52rem;border-top:1px solid #dee2e6;padding-top:0.05rem;margin-top:0.05rem;font-weight:bold;"><span>DED.</span><span class="text-danger">₱ <?= number_format(round($d['total_deductions']), 2) ?></span></div>
+                    <?php if (($d['sss_deduction'] ?? 0) > 0): ?><div class="ps-row"><span>SSS</span><span class="text-danger">₱ <?= number_format(round($d['sss_deduction']), 2) ?></span></div><?php endif; ?>
+                    <?php if (($d['philhealth_deduction'] ?? 0) > 0): ?><div class="ps-row"><span>PhilHealth</span><span class="text-danger">₱ <?= number_format(round($d['philhealth_deduction']), 2) ?></span></div><?php endif; ?>
+                    <?php if (($d['pagibig_deduction'] ?? 0) > 0): ?><div class="ps-row"><span>Pag-IBIG</span><span class="text-danger">₱ <?= number_format(round($d['pagibig_deduction']), 2) ?></span></div><?php endif; ?>
+                    <?php if (($d['other_deductions'] ?? 0) > 0 || ($d['pharmacy_deduction'] ?? 0) > 0): ?>
+                        <?php
+                            $empDeds      = $empDedsMap[$d['employee_id']] ?? [];
+                            $pharmDedList = array_filter($empDeds, fn($e) => ($e['type'] ?? '') === 'Pharmacy');
+                            $otherDedList = array_filter($empDeds, fn($e) => ($e['type'] ?? '') !== 'Pharmacy');
+                            $pharmTotal   = array_sum(array_column($pharmDedList, 'amount_deducted'));
+                        ?>
+                        <?php if ($pharmTotal > 0): ?>
+                            <?php foreach ($pharmDedList as $ed): ?>
+                    <div class="ps-row"><span><?= esc($ed['description'] ?? $ed['type'] ?? 'Pharmacy') ?></span><span class="text-danger">₱ <?= number_format(round($ed['amount_deducted']), 2) ?></span></div>
+                            <?php endforeach; ?>
+                    <div class="ps-row text-muted small"><span>Pharmacy total</span><span>₱ <?= number_format(round($pharmTotal), 2) ?></span></div>
+                        <?php elseif (($d['pharmacy_deduction'] ?? 0) > 0): ?>
+                    <div class="ps-row"><span>Pharmacy</span><span class="text-danger">₱ <?= number_format(round($d['pharmacy_deduction']), 2) ?></span></div>
+                        <?php endif; ?>
+                        <?php if ($otherDedList): foreach ($otherDedList as $ed): ?>
+                    <div class="ps-row"><span><?= esc($ed['description'] ?? $ed['type'] ?? 'Other Deduction') ?></span><span class="text-danger">₱ <?= number_format(round($ed['amount_deducted']), 2) ?></span></div>
+                        <?php endforeach; elseif (($d['other_deductions'] ?? 0) > 0): ?>
+                    <div class="ps-row"><span>Other Ded.</span><span class="text-danger">₱ <?= number_format(round($d['other_deductions']), 2) ?></span></div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    <div class="ps-row ps-total"><span>DED.</span><span class="text-danger">₱ <?= number_format(round($d['total_deductions']), 2) ?></span></div>
+                </div>
             </div>
-        </div>
-        <div style="padding: 0.1rem 0.2rem; text-align: center; border-top: 1px solid #dee2e6;">
-            <div class="text-muted" style="font-size:0.5rem;">NET PAY</div>
-            <div class="fw-bold" style="font-size:0.8rem;color:var(--primary);">₱ <?= number_format(round($d['net_pay']), 2) ?></div>
-        </div>
-        </div> <!-- close payslip-wrapper -->
-    <?php endforeach; ?>
+
+            <!-- Net Pay -->
+            <div class="ps-net">
+                <span class="ps-net-label">NET PAY</span>
+                <span class="ps-net-value">₱ <?= number_format(round($d['net_pay']), 2) ?></span>
+            </div>
+
+        </div><!-- /payslip-wrapper -->
+        <?php endforeach; ?>
     </div>
-    <?php endfor; ?>
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous"/>

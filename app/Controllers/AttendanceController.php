@@ -6,6 +6,7 @@ use CodeIgniter\Controller;
 use App\Models\AttendanceModel;
 use App\Models\EmployeeModel;
 use App\Models\AuditLogModel;
+use App\Models\BranchModel;
 
 /**
  * AttendanceController – daily attendance input and records.
@@ -27,9 +28,25 @@ class AttendanceController extends Controller
     public function dashboard()
     {
         $date = $this->request->getGet('date') ?? date('Y-m-d');
+        $branchId = $this->request->getGet('branch_id');
+        $userBranch = user_branch_id();
 
-        // Scope employees to user's branch restriction
-        $employees = $this->empModel->getActiveList(user_branch_id());
+        // If user has a branch restriction, force their branch and hide filter
+        if ($userBranch) {
+            $filterBranch = (int)$userBranch;
+            $branchId = $userBranch; // for view
+        } else {
+            $filterBranch = $branchId ? (int)$branchId : null;
+        }
+
+        // Get employees with branch info
+        $builder = $this->empModel->select('employees.*, branches.name AS branch_name')
+            ->join('branches', 'branches.id = employees.branch_id', 'left')
+            ->where('employees.status', 'active');
+        if ($filterBranch) {
+            $builder->where('employees.branch_id', $filterBranch);
+        }
+        $employees = $builder->orderBy('employees.full_name', 'ASC')->findAll();
 
         // Existing attendance for that date
         $existing = $this->model->getByDate($date);
@@ -38,11 +55,17 @@ class AttendanceController extends Controller
             $existingMap[$row['employee_id']] = $row;
         }
 
+        // All branches for filter dropdown (only show if userBranch is empty)
+        $branches = $userBranch ? [] : (new BranchModel())->getActiveList();
+
         return view('attendance/index', [
             'title'       => 'Daily Attendance',
             'date'        => $date,
             'employees'   => $employees,
             'existingMap' => $existingMap,
+            'branches'    => $branches,
+            'branchId'    => $branchId,
+            'userBranch'  => $userBranch,
         ]);
     }
 
@@ -78,7 +101,10 @@ class AttendanceController extends Controller
             return redirect()->back()->with('error', 'No attendance data submitted.')->withInput();
         }
 
-        $savedCount = 0;
+        $savedCount   = 0;
+        $sundayAbsent = []; // track names set as absent on Sunday
+        $isSunday     = (int) date('N', strtotime($date)) === 7;
+
         foreach ($attendance as $employeeId => $type) {
             $employeeId = (int) $employeeId;
             if (! in_array($type, ['whole_day', 'half_am', 'half_pm', 'absent', 'day_off'], true)) {
@@ -107,6 +133,11 @@ class AttendanceController extends Controller
                 'created_by'      => session()->get('user_id'),
             ];
 
+            // Conflict flag: absent on Sunday
+            if ($isSunday && $type === 'absent') {
+                $sundayAbsent[] = $emp['full_name'];
+            }
+
             if ($existing) {
                 $this->model->update($existing['id'], $rowData);
                 $this->audit->logAction('Attendance', 'update', $existing['id'], $existing, $rowData,
@@ -119,8 +150,13 @@ class AttendanceController extends Controller
             $savedCount++;
         }
 
-        return redirect()->to(site_url('attendance?date=' . $date))
-                         ->with('success', "Attendance saved for {$savedCount} employee(s).");
+        $msg = "Attendance saved for {$savedCount} employee(s).";
+        if (! empty($sundayAbsent)) {
+            $names = implode(', ', array_map('esc', $sundayAbsent));
+            $msg  .= " Warning: the following employee(s) were marked Absent on a Sunday — {$names}.";
+        }
+
+        return redirect()->to(site_url('attendance?date=' . $date))->with('success', $msg);
     }
 
     /** Create form (redirects to dashboard with date param). */
@@ -135,12 +171,16 @@ class AttendanceController extends Controller
         $month = $this->request->getGet('month') ?? date('Y-m');
         [$year, $mon] = explode('-', $month);
 
-        $summary = $this->model->monthlySummary((int) $year, (int) $mon, user_branch_id());
+        $summary      = $this->model->monthlySummary((int) $year, (int) $mon, user_branch_id());
+        $deptWdMap    = (new \App\Models\DepartmentModel())->getWorkingDaysMap();
+        $calendarDays = (int) date('t', strtotime($month . '-01'));
 
         return view('attendance/records', [
-            'title'   => 'Attendance Records',
-            'month'   => $month,
-            'summary' => $summary,
+            'title'       => 'Attendance Records',
+            'month'       => $month,
+            'summary'     => $summary,
+            'deptWdMap'   => $deptWdMap,
+            'calendarDays'=> $calendarDays,
         ]);
     }
 
@@ -156,15 +196,20 @@ class AttendanceController extends Controller
         $start = $month . '-01';
         $end   = date('Y-m-t', strtotime($start));
 
-        $records = $this->model->getByEmployeeAndPeriod($employeeId, $start, $end);
+        $records      = $this->model->getByEmployeeAndPeriod($employeeId, $start, $end);
+        $deptWdMap    = (new \App\Models\DepartmentModel())->getWorkingDaysMap();
+        $calendarDays = (int) date('t', strtotime($start));
+        $deptWd       = (float) ($deptWdMap[$employee['department'] ?? ''] ?? 26);
+        $monthlyWd    = $deptWd + ($calendarDays - 30);
 
         return view('attendance/view', [
-            'title'    => 'Attendance – ' . $employee['full_name'],
-            'employee' => $employee,
-            'records'  => $records,
-            'month'    => $month,
-            'start'    => $start,
-            'end'      => $end,
+            'title'     => 'Attendance – ' . $employee['full_name'],
+            'employee'  => $employee,
+            'records'   => $records,
+            'month'     => $month,
+            'start'     => $start,
+            'end'       => $end,
+            'monthlyWd' => $monthlyWd,
         ]);
     }
 
@@ -180,6 +225,18 @@ class AttendanceController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Invalid field.']);
         }
 
+        // Validate value per field
+        if ($field === 'attendance_type') {
+            if (! in_array($value, ['whole_day', 'half_am', 'half_pm', 'absent', 'day_off'], true)) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Invalid attendance type.']);
+            }
+        } elseif ($field === 'overtime_hours') {
+            if (! is_numeric($value) || (float) $value < 0 || (float) $value > 24) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Overtime hours must be between 0 and 24.']);
+            }
+            $value = (float) $value;
+        }
+
         $record = $this->model->find($id);
         if (! $record) {
             return $this->response->setJSON(['success' => false, 'message' => 'Record not found.']);
@@ -190,11 +247,18 @@ class AttendanceController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Access denied.']);
         }
 
+        // Conflict check: warn if marking absent on a Sunday (still allowed, but flagged)
+        $isSunday = (int) date('N', strtotime($record['attendance_date'])) === 7;
+        $warning  = null;
+        if ($field === 'attendance_type' && $value === 'absent' && $isSunday) {
+            $warning = 'Note: employee marked Absent on a Sunday (normally a half-day).';
+        }
+
         $this->model->update($id, [$field => $value]);
         $oldVal = $record[$field] ?? 'N/A';
         $this->audit->logAction('Attendance', 'field_update', $id, $record, [$field => $value],
-            "Changed attendance #{$id} — {$field}: '{$oldVal}' → '{$value}'");
+            "Changed attendance #{$id} — {$field}: '{$oldVal}' → '{$value}'" . ($warning ? ' [' . $warning . ']' : ''));
 
-        return $this->response->setJSON(['success' => true]);
+        return $this->response->setJSON(['success' => true, 'warning' => $warning]);
     }
 }

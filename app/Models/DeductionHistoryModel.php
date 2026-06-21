@@ -31,6 +31,22 @@ class DeductionHistoryModel extends Model
     }
 
     /**
+     * Get deduction history entries for a payslip cutoff range.
+     */
+    public function getForPayslip(int $employeeId, int $payrollId, int $payrollCutoff, string $cutoffStart, string $cutoffEnd): array
+    {
+        return $this->select('deduction_history.*, employee_deductions.description, employee_deductions.type')
+                    ->join('employee_deductions', 'employee_deductions.id = deduction_history.employee_deduction_id')
+                    ->where('employee_deductions.employee_id', $employeeId)
+                    ->where('deduction_history.payroll_id', $payrollId)
+                    ->where('deduction_history.payroll_cutoff', $payrollCutoff)
+                    ->where('DATE(deduction_history.created_at) >=', $cutoffStart)
+                    ->where('DATE(deduction_history.created_at) <=', $cutoffEnd)
+                    ->orderBy('deduction_history.created_at', 'ASC')
+                    ->findAll();
+    }
+
+    /**
      * Remove history entry for a deduction+payroll pair (used when toggling OFF).
      */
     public function removeForPayroll(int $deductionId, int $payrollId): void

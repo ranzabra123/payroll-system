@@ -30,9 +30,9 @@
         <h5 class="mb-0 fw-semibold">Payroll Runs</h5>
     </div>
     <?php if (can_do('payroll', 'add')): ?>
-    <a href="<?= site_url('payroll/create') ?>" class="btn btn-primary btn-sm">
+    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#generateModal">
         <i class="fa fa-plus me-1"></i>Generate Payroll
-    </a>
+    </button>
     <?php endif; ?>
 </div>
 
@@ -190,6 +190,105 @@
         </div>
     </div>
 </div>
+
+<?php if (can_do('payroll', 'add')): ?>
+<!-- Generate Payroll Modal -->
+<div class="modal fade" id="generateModal" tabindex="-1" aria-labelledby="generateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="generateModalLabel">
+                    <i class="fa fa-calculator me-2"></i>Generate Payroll
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="<?= site_url('payroll/generate') ?>" method="POST" novalidate>
+                <?= csrf_field() ?>
+                <div class="modal-body">
+                    <p class="text-muted small mb-4">
+                        Select the payroll period and cutoff. The system will automatically compute pay
+                        based on attendance records, configuration, and deduction rates.
+                    </p>
+                    <div class="row g-4">
+                        <!-- Column 1: Month -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium">Payroll Month <span class="text-danger">*</span></label>
+                            <input type="month" name="payroll_month" id="modal_payroll_month" class="form-control"
+                                   value="<?= date('Y-m') ?>" required/>
+                            <div class="form-text">Select the year and month for this payroll run.</div>
+                        </div>
+                        <!-- Column 2: Cutoff -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium">Cut-off Period <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-3 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cutoff" id="mc1" value="1" required checked/>
+                                    <label class="form-check-label" for="mc1">
+                                        <span class="fw-semibold">1st Cutoff</span><br/>
+                                        <span class="text-muted small">1 &ndash; 15 of the month</span>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cutoff" id="mc2" value="2" required/>
+                                    <label class="form-check-label" for="mc2">
+                                        <span class="fw-semibold">2nd Cutoff</span><br/>
+                                        <span class="text-muted small">16 &ndash; end of the month</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning py-2 small mt-3 d-none" id="modal-deduction-warning">
+                        <i class="fa fa-circle-info me-2"></i>
+                        Deductions (SSS, PhilHealth, Pag-IBIG) will be deducted in this cut-off!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-calculator me-1"></i>Generate Payroll
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const monthInput = document.getElementById('modal_payroll_month');
+    const c1         = document.getElementById('mc1');
+    const c2         = document.getElementById('mc2');
+    const warning    = document.getElementById('modal-deduction-warning');
+    const BASE_URL   = '<?= site_url('payroll/create') ?>';
+
+    function updateCutoffs(month) {
+        fetch(BASE_URL + '?payroll_month=' + encodeURIComponent(month), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            c1.disabled = !!data.disableFirst;
+            c2.disabled = !!data.disableSecond;
+            if (data.disableFirst && !data.disableSecond) {
+                c2.checked = true;
+            } else {
+                c1.checked = true;
+            }
+            warning.classList.toggle('d-none', !data.firstCutoffFinalized);
+        })
+        .catch(() => {});
+    }
+
+    monthInput.addEventListener('change', function () {
+        updateCutoffs(this.value);
+    });
+
+    document.getElementById('generateModal').addEventListener('show.bs.modal', function () {
+        updateCutoffs(monthInput.value);
+    });
+}());
+</script>
+<?php endif; ?>
 
 <?= $this->endSection() ?>
 

@@ -64,7 +64,7 @@ $badgeCls = match($deduction['status']) {
                     </div>
                     <div class="col-sm-6">
                         <div class="text-muted small">Deduct On</div>
-                        <div class="fw-semibold"><?= match($deduction['cutoff']) { '15' => 'Every 15th (1st Cutoff)', '30' => 'Every 30th (2nd Cutoff)', default => 'Every Cutoff (15 &amp; 30)' } ?></div>
+                        <div class="fw-semibold"><?= match($deduction['cutoff']) { '15' => 'Every 15th (1st Cutoff)', '30' => 'Every 30th (2nd Cutoff)', 'full' => 'Deduct in Full (Once)', default => 'Every Cutoff (15 &amp; 30)' } ?></div>
                     </div>
                     <div class="col-sm-6">
                         <div class="text-muted small">Description</div>
@@ -135,7 +135,7 @@ $badgeCls = match($deduction['status']) {
 <div class="card mt-4">
     <div class="card-header fw-semibold d-flex align-items-center gap-2">
         <i class="fa fa-clock-rotate-left text-primary"></i>
-        Deduction History
+        Deduction History — Database records from deduction_history
         <span class="badge bg-secondary ms-1"><?= count($history) ?></span>
     </div>
     <div class="card-body p-0">
@@ -149,20 +149,22 @@ $badgeCls = match($deduction['status']) {
             <table class="table table-hover mb-0 align-middle small">
                 <thead class="table-light">
                     <tr>
-                        <th>Payroll Period</th>
+                        <th>Payroll</th>
                         <th class="text-center">Cutoff</th>
-                        <th class="text-end">Amount Deducted</th>
+                        <th class="text-end">Amount Deducted (This Cutoff)</th>
                         <th class="text-end">Balance Before</th>
                         <th class="text-end">Balance After</th>
                         <th class="text-center">Payroll Status</th>
-                        <th>Date</th>
+                        <th>Date Recorded</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($history as $h): ?>
                 <tr>
                     <td class="fw-semibold">
-                        <?= date('M Y', strtotime($h['period_start'])) ?>
+                        <a href="<?= site_url('payroll/view/' . $h['payroll_id']) ?>">
+                            <?= date('M Y', strtotime($h['period_start'])) ?>
+                        </a>
                         <div class="text-muted" style="font-size:.75rem;">
                             <?= date('M j', strtotime($h['period_start'])) ?> – <?= date('M j, Y', strtotime($h['period_end'])) ?>
                         </div>

@@ -29,23 +29,20 @@
             <div class="mb-4">
                 <label class="form-label fw-medium">Cut-off Period <span class="text-danger">*</span></label>
                 <div class="d-flex gap-3">
-                    <?php if (! $firstCutoffFinalized): ?>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="cutoff" id="c1" value="1" checked required/>
+                        <input class="form-check-input" type="radio" name="cutoff" id="c1" value="1" required <?= isset($disableFirst) && $disableFirst ? 'disabled' : '' ?> <?= (!isset($disableFirst) || !$disableFirst) ? 'checked' : '' ?>/>
                         <label class="form-check-label" for="c1">
                             <span class="fw-semibold">1st Cutoff</span><br/>
                             <span class="text-muted small">1 – 15 of the month</span>
                         </label>
                     </div>
-                    <?php else: ?>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="cutoff" id="c2" value="2" checked required/>
+                        <input class="form-check-input" type="radio" name="cutoff" id="c2" value="2" required <?= isset($disableSecond) && $disableSecond ? 'disabled' : '' ?> <?= (isset($disableFirst) && $disableFirst && isset($disableSecond) && !$disableSecond) ? 'checked' : '' ?>/>
                         <label class="form-check-label" for="c2">
                             <span class="fw-semibold">2nd Cutoff</span><br/>
                             <span class="text-muted small">16 – end of the month</span>
                         </label>
                     </div>
-                    <?php endif; ?>
                 </div>
             </div>
 

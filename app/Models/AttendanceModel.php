@@ -87,14 +87,17 @@ class AttendanceModel extends Model
         $rows = $this->getByEmployeeAndPeriod($employeeId, $start, $end);
 
         $summary = [
-            'whole_days'     => 0,
-            'half_days'      => 0,
-            'absent_days'    => 0,
-            'overtime_hours' => 0.0,
-            'days_worked'    => 0.0,
+            'whole_days'      => 0,
+            'half_days'       => 0,
+            'absent_days'     => 0,
+            'day_off'         => 0,
+            'sunday_half_days'=> 0,
+            'overtime_hours'  => 0.0,
+            'days_worked'     => 0.0,
         ];
 
         foreach ($rows as $row) {
+            $isSunday = (int) date('N', strtotime($row['attendance_date'])) === 7;
             switch ($row['attendance_type']) {
                 case 'whole_day':
                     $summary['whole_days']++;
@@ -104,12 +107,15 @@ class AttendanceModel extends Model
                 case 'half_pm':
                     $summary['half_days']++;
                     $summary['days_worked'] += 0.5;
+                    if ($isSunday) {
+                        $summary['sunday_half_days']++;
+                    }
                     break;
                 case 'absent':
                     $summary['absent_days']++;
                     break;
                 case 'day_off':
-                    // Day off: excluded from salary calculation entirely
+                    $summary['day_off']++;
                     break;
             }
             $summary['overtime_hours'] += (float) $row['overtime_hours'];
@@ -132,6 +138,7 @@ class AttendanceModel extends Model
                 'e.employee_code',
                 'e.full_name',
                 'e.position',
+                'e.department',
                 'SUM(CASE WHEN a.attendance_type = "whole_day" THEN 1 ELSE 0 END) AS whole_days',
                 'SUM(CASE WHEN a.attendance_type IN ("half_am","half_pm") THEN 1 ELSE 0 END) AS half_days',
                 'SUM(CASE WHEN a.attendance_type = "absent" THEN 1 ELSE 0 END) AS absent_days',

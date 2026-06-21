@@ -67,6 +67,7 @@ $cutoffLabel = match($filters['cutoff'] ?? '') {
             <option value="">All Types</option>
             <option value="Cash Advance" <?= $filters['type'] === 'Cash Advance' ? 'selected' : '' ?>>Cash Advance</option>
             <option value="Debt"         <?= $filters['type'] === 'Debt'         ? 'selected' : '' ?>>Debt / Loan</option>
+            <option value="Pharmacy"     <?= $filters['type'] === 'Pharmacy'     ? 'selected' : '' ?>>Pharmacy</option>
         </select>
 
         <select name="status" class="form-select form-select-sm" style="width:140px;">
@@ -169,9 +170,14 @@ $cutoffLabel = match($filters['cutoff'] ?? '') {
                             </td>
                             <td class="small text-muted"><?= esc($d['department'] ?? '—') ?></td>
                             <td>
-                                <span class="badge <?= $d['type'] === 'Cash Advance' ? 'bg-info text-dark' : 'bg-warning text-dark' ?>">
-                                    <?= $d['type'] === 'Cash Advance' ? 'CA' : 'Debt' ?>
-                                </span>
+                                <?php
+                                    [$_tbadge, $_tlabel] = match($d['type']) {
+                                        'Cash Advance' => ['bg-info text-dark',    'CA'],
+                                        'Pharmacy'     => ['bg-success text-white', 'Pharmacy'],
+                                        default        => ['bg-warning text-dark',  'Debt'],
+                                    };
+                                ?>
+                                <span class="badge <?= $_tbadge ?>"><?= $_tlabel ?></span>
                             </td>
                             <td class="small"><?= esc($d['description'] ?? '—') ?></td>
                             <td class="text-center">

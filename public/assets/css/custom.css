@@ -4,7 +4,7 @@
 
 /* Variables */
 :root {
-    --sidebar-width: 260px;
+    --sidebar-width: 234px;
     --primary:       #2563eb;
     --primary-dark:  #1e40af;
     --sidebar-bg:    #1e293b;
@@ -345,8 +345,26 @@ body.sidebar-collapsed #main-content { margin-left: 0; }
 
 /* ---- Print styles ---- */
 @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+
+    /* Hide chrome */
     #sidebar, #topbar, .no-print { display: none !important; }
-    #main-content { margin-left: 0 !important; }
+
+    /* Reset layout so content fills the full page */
+    body, html { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    #main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; float: none !important; min-height: 0 !important; display: block !important; }
+    .page-body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+    /* Table */
+    .table-responsive { overflow: visible !important; }
+    .table { width: 100% !important; table-layout: auto !important; }
+    .table th, .table td { font-size: 8pt !important; padding: 3px 4px !important; white-space: nowrap !important; }
+
+    /* Cards */
+    .card { border: none !important; box-shadow: none !important; }
+    .card-body { padding: 0 !important; }
+    .card-header { border: none !important; padding: 0 0 4px 0 !important; }
+
+    /* Payslip */
     .payslip-wrapper { box-shadow: none; border: 1px solid #ccc; }
-    .page-body { padding: 0; }
 }
